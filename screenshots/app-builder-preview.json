@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "ParadaMaya",
+      "hasCanvas": false,
+      "bodyTextLen": 241,
+      "bodyTextHash": "e0a45e8b83cc53aa8639e25404dd3f45c3263879ccfc5ae0aa991d3122e173d8",
+      "bodyTextPrefix": "COMUNIDAD DE MADRID ParadaMaya TX-1854 · red Maya conectando HOY",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "ParadaMaya",
+      "hasCanvas": false,
+      "bodyTextLen": 239,
+      "bodyTextHash": "d47b9f8999275bb3e9ac36adc0402304d03883cd21577ac6735667706347eb52",
+      "bodyTextPrefix": "COMUNIDAD DE MADRID ParadaMaya TX-4400 · red Maya en malla HOY 0",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
