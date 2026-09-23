@@ -55,7 +55,6 @@
     padding-left: 100%;
     animation: ticker-scroll 28s linear infinite;
   }
-  #news-ticker .ticker-track:hover { animation-play-state: paused; }
   @keyframes ticker-scroll {
     0%   { transform: translateX(0); }
     100% { transform: translateX(-100%); }
@@ -66,9 +65,23 @@
     50%      { transform: scale(1.18); filter: drop-shadow(0 0 12px rgba(255,80,0,1)); }
   }
   .fire-icon {
+    position: relative;
     font-size: 30px;
     animation: fire-pulse 1.1s ease-in-out infinite;
     text-align: center;
+    line-height: 30px;
+  }
+  .fire-count {
+    position: absolute;
+    top: -6px; right: -10px;
+    background: #dc2626;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 9999px;
+    border: 1.5px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
   }
 
   #fab-hay-publico {
@@ -84,7 +97,9 @@
     box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0.7);
     animation: fab-pulse 2s infinite;
     display: flex; align-items: center; gap: 6px;
+    border: none;
   }
+  #fab-hay-publico:disabled { opacity: .55; animation: none; }
   @keyframes fab-pulse {
     0%   { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0.7); }
     70%  { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 18px rgba(220,38,38,0); }
@@ -115,26 +130,16 @@
         <div style="max-width:420px;margin:80px auto;">
           <div style="font-size:64px;">⛔</div>
           <h1 style="color:#dc2626;margin:8px 0 16px;">Acceso no autorizado</h1>
-          <p style="color:#aaa;line-height:1.6;">
-            Esta aplicación está protegida y solo puede ejecutarse desde su dominio oficial.
-          </p>
+          <p style="color:#aaa;line-height:1.6;">Esta aplicación está protegida y solo puede ejecutarse desde su dominio oficial.</p>
           <p style="color:#f5b400;font-weight:bold;font-size:18px;">caparo-bit.github.io</p>
           <hr style="border:0;border-top:1px solid #333;margin:32px 0;">
-          <p style="color:#666;font-size:12px;line-height:1.6;">
-            © 2026 TaxiDiario · Todos los derechos reservados.<br>
-            El uso no autorizado de este software está terminantemente prohibido.
-          </p>
+          <p style="color:#666;font-size:12px;line-height:1.6;">© 2026 TaxiDiario · Todos los derechos reservados.<br>El uso no autorizado de este software está terminantemente prohibido.</p>
         </div>
       </body>`;
     throw new Error("Dominio no autorizado");
   }
 })();
-
-/* ---------- Anti-manipulación ligera ---------- */
-try {
-  Object.defineProperty(window, "__TAXI_APP__", { value:"TaxiDiario-©2026", writable:false, configurable:false });
-  Object.freeze(Object.prototype);
-} catch(e) {}
+try { Object.defineProperty(window, "__TAXI_APP__", { value:"TaxiDiario-©2026", writable:false, configurable:false }); } catch(e) {}
 
 /* ===================== Configuración ===================== */
 const RADIO_PREGUNTAR      = 150;
@@ -149,6 +154,23 @@ const HAY_PUBLICO_TTL_MAX      = 10*60*1000;
 const HAY_PUBLICO_VENTANA_MS   = 5*60*1000;
 const HAY_PUBLICO_UMBRAL       = 5;
 const NTFY_BASE = "https://ntfy.sh";
+
+/* ---------- Clusters ---------- */
+const CENTRO_RADIO_M = 4000;
+const SOL_LAT = 40.4168, SOL_LNG = -3.7038;
+const UMBRAL_CENTRO = 1000;
+const UMBRAL_FUERA  = 5000;
+const UMBRAL_MIXTO  = 2500;
+const CLUSTERS_VECINOS = 3;
+const FILTRO_RADIO_AVISO_M = 3000;
+
+/* ---------- Canales (privados, con hash determinista) ---------- */
+const SEED_CANAL = "txd-2026-caparo-bit-paradas-cambia-esta-semilla-por-algo-unico-tuyo-a8f3e1b9c2d4";
+const PREFIJO_CANAL = "txd-cl-";
+
+/* ---------- Anti-spam ---------- */
+const MISMA_PARADA_MS  = 60*1000;
+const MISMA_PARADA_DEDUP_MS = 5*60*1000;
 
 /* ===================== Catálogo de paradas ===================== */
 const PARADAS_CATALOGO = [
@@ -221,15 +243,16 @@ const PARADAS_CATALOGO = [
 ];
 
 /* ===================== Estado ===================== */
-const STORAGE_KEY = "taxidiario-v6";
+const STORAGE_KEY = "taxidiario-v8";
 const state = {
   view:"home", conductor:"", matricula:"",
   services:[], gastos:[], jornadas:[], jornadaActivaId:null,
   waitRecords:{}, activeWait:null,
   paradasUsuario:[],
   expandedJornadaId:null,
-  canalPublico:"taxidiario-x7k9m2p4q8w3v6n1",  // canal privado por defecto
   hayPublico:[],
+  sonidoActivo: true,
+  ultimoAviso: {}, // { paradaKey: ts } para anti-spam
 };
 
 function load() {
@@ -238,6 +261,8 @@ function load() {
     proximityState[state.activeWait.paradaId] = { status:"waiting", startTime: state.activeWait.startTime, lastSeen: Date.now() };
   }
   if (!state.hayPublico) state.hayPublico = [];
+  if (!state.ultimoAviso) state.ultimoAviso = {};
+  if (typeof state.sonidoActivo !== "boolean") state.sonidoActivo = true;
 }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
 function uid(p){ return `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`; }
@@ -273,11 +298,196 @@ const proximityState = {};
 const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
 const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
 
-/* ===================== Hay Público (ntfy.sh) ===================== */
-let sseConnection = null;
-let fireMarkers = [];
+/* ===================== Hash determinista para canales ===================== */
+function fnv1a(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+function hashCanal(seed, id) {
+  const a = fnv1a(seed + "|A|" + id);
+  const b = fnv1a(seed + "|B|" + id);
+  return PREFIJO_CANAL + a + b;
+}
 
-function getCanal() { return (state.canalPublico || "taxidiario-x7k9m2p4q8w3v6n1").trim(); }
+/* ===================== Clusters ===================== */
+function esCentro(p) { return distanceMeters(SOL_LAT, SOL_LNG, p.lat, p.lng) < CENTRO_RADIO_M; }
+
+function calcularClusters() {
+  const paradas = getAllParadas();
+  const padre = {};
+  paradas.forEach(p => { padre[p.id] = p.id; });
+  function find(x) {
+    while (padre[x] !== x) { padre[x] = padre[padre[x]]; x = padre[x]; }
+    return x;
+  }
+  function union(a, b) {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) padre[ra] = rb;
+  }
+  for (let i = 0; i < paradas.length; i++) {
+    for (let j = i+1; j < paradas.length; j++) {
+      const a = paradas[i], b = paradas[j];
+      const d = distanceMeters(a.lat, a.lng, b.lat, b.lng);
+      const aC = esCentro(a), bC = esCentro(b);
+      const umbral = (aC && bC) ? UMBRAL_CENTRO : (!aC && !bC) ? UMBRAL_FUERA : UMBRAL_MIXTO;
+      if (d <= umbral) union(a.id, b.id);
+    }
+  }
+  const grupos = {};
+  paradas.forEach(p => {
+    const r = find(p.id);
+    if (!grupos[r]) grupos[r] = { id: r, paradas: [], centroid: { lat:0, lng:0 }, nombre: "" };
+    grupos[r].paradas.push(p);
+  });
+  Object.values(grupos).forEach(g => {
+    g.centroid.lat = g.paradas.reduce((s,p)=>s+p.lat,0) / g.paradas.length;
+    g.centroid.lng = g.paradas.reduce((s,p)=>s+p.lng,0) / g.paradas.length;
+    // Nombre: municipio/barrio más frecuente
+    const munis = {}, barrios = {};
+    g.paradas.forEach(p => {
+      munis[p.municipio] = (munis[p.municipio]||0) + 1;
+      barrios[p.barrio] = (barrios[p.barrio]||0) + 1;
+    });
+    const topMuni = Object.entries(munis).sort((a,b)=>b[1]-a[1])[0][0];
+    const topBarrio = Object.entries(barrios).sort((a,b)=>b[1]-a[1])[0][0];
+    g.nombre = topMuni === "Madrid" ? topBarrio : topMuni;
+    g.canal = hashCanal(SEED_CANAL, g.id);
+  });
+  return Object.values(grupos);
+}
+
+let CLUSTERS = [];
+function recalcularClusters() { CLUSTERS = calcularClusters(); }
+
+function getClusterActual() {
+  if (!lastPosition || CLUSTERS.length === 0) return null;
+  let mejor = null, mejorDist = Infinity;
+  CLUSTERS.forEach(c => {
+    const d = distanceMeters(lastPosition.lat, lastPosition.lng, c.centroid.lat, c.centroid.lng);
+    if (d < mejorDist) { mejorDist = d; mejor = c; }
+  });
+  return mejor;
+}
+
+function getClustersCercanos(n) {
+  if (!lastPosition || CLUSTERS.length === 0) return [];
+  return CLUSTERS
+    .map(c => ({ c, d: distanceMeters(lastPosition.lat, lastPosition.lng, c.centroid.lat, c.centroid.lng) }))
+    .sort((a,b) => a.d - b.d)
+    .slice(0, n)
+    .map(x => x.c);
+}
+
+/* ===================== Suscripciones SSE ===================== */
+const suscripciones = {}; // { clusterId: EventSource }
+
+function gestionarSuscripciones() {
+  if (!lastPosition || CLUSTERS.length === 0) return;
+  const deseados = getClustersCercanos(CLUSTERS_VECINOS).map(c => c.id);
+  const deseadosSet = new Set(deseados);
+
+  Object.keys(suscripciones).forEach(id => {
+    if (!deseadosSet.has(id)) {
+      try { suscripciones[id].close(); } catch(e){}
+      delete suscripciones[id];
+    }
+  });
+
+  deseados.forEach(id => {
+    if (!suscripciones[id]) {
+      const c = CLUSTERS.find(x => x.id === id);
+      if (c) suscribirCluster(c);
+    }
+  });
+}
+
+async function suscribirCluster(cluster) {
+  const canal = cluster.canal;
+  // Cargar últimos avisos (15 min)
+  try {
+    const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(canal)}/json?poll=1&since=15m`);
+    const texto = await res.text();
+    texto.trim().split("\n").filter(Boolean).forEach(line => {
+      try {
+        const data = JSON.parse(line);
+        if (data.event === "message" && data.message) {
+          const payload = JSON.parse(data.message);
+          if (payload.type === "hayPublico") procesarAviso(payload, false);
+        }
+      } catch(e){}
+    });
+  } catch(e) {}
+
+  try {
+    const es = new EventSource(`${NTFY_BASE}/${encodeURIComponent(canal)}/sse`);
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.event === "message" && data.message) {
+          const payload = JSON.parse(data.message);
+          if (payload.type === "hayPublico") procesarAviso(payload, true);
+        }
+      } catch(err) {}
+    };
+    es.onerror = () => {};
+    suscripciones[cluster.id] = es;
+  } catch(e) {}
+}
+
+function procesarAviso(payload, esNuevo) {
+  if (lastPosition) {
+    const d = distanceMeters(lastPosition.lat, lastPosition.lng, payload.lat, payload.lng);
+    if (d > FILTRO_RADIO_AVISO_M) return;
+  }
+  if (state.hayPublico.find(a => a.id === payload.id)) return;
+  addHayPublico(payload);
+  if (esNuevo) notificarAviso(payload);
+}
+
+/* ===================== Feedback (sonido + vibración + notificación) ===================== */
+let audioCtx = null;
+function beep() {
+  if (!state.sonidoActivo) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch(e) {}
+}
+
+function notificarAviso(payload) {
+  try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch(e){}
+  beep();
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification("🔥 Hay público", {
+        body: payload.paradaNombre ? `En ${payload.paradaNombre}` : "En tu zona",
+        tag: "hay-publico-" + payload.id,
+        icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔥</text></svg>",
+      });
+    } catch(e) {}
+  }
+}
+
+async function pedirPermisoNotificaciones() {
+  if ("Notification" in window && Notification.permission === "default") {
+    try { await Notification.requestPermission(); } catch(e){}
+  }
+}
+
+/* ===================== Hay Público ===================== */
+let fireMarkers = [];
 
 function notificarHayPublico() {
   if (!lastPosition) { showToast("⚠️ Necesito tu ubicación GPS"); return; }
@@ -287,6 +497,30 @@ function notificarHayPublico() {
     .sort((a,b) => a.d - b.d);
   const parada = cercanas[0] && cercanas[0].d < 300 ? cercanas[0].p : null;
 
+  // Anti-spam: dedup por parada
+  const clave = parada?.id || `${lastPosition.lat.toFixed(3)}_${lastPosition.lng.toFixed(3)}`;
+  const ultimo = state.ultimoAviso[clave] || 0;
+  const ahora = Date.now();
+  if (ahora - ultimo < MISMA_PARADA_MS) {
+    const seg = Math.ceil((MISMA_PARADA_MS - (ahora - ultimo)) / 1000);
+    showToast(`⏳ Espera ${seg}s antes de volver a avisar aquí`);
+    return;
+  }
+
+  // Dedup: si ya hay aviso activo en esa parada en últimos 5 min, ignorar
+  if (parada) {
+    const reciente = state.hayPublico.find(a =>
+      a.paradaId === parada.id && (ahora - a.ts) < MISMA_PARADA_DEDUP_MS
+    );
+    if (reciente) {
+      showToast(`🔥 Ya hay un aviso activo en ${parada.nombre}`);
+      return;
+    }
+  }
+
+  const cluster = getClusterActual();
+  if (!cluster) { showToast("⚠️ No puedo determinar tu zona"); return; }
+
   const msg = {
     type: "hayPublico",
     id: uid("hp"),
@@ -294,18 +528,20 @@ function notificarHayPublico() {
     lng: lastPosition.lng,
     paradaId: parada?.id || null,
     paradaNombre: parada?.nombre || null,
+    clusterId: cluster.id,
     usuario: state.conductor || "Taxi",
-    ts: Date.now(),
+    ts: ahora,
   };
 
+  state.ultimoAviso[clave] = ahora;
   addHayPublico(msg);
 
-  fetch(`${NTFY_BASE}/${encodeURIComponent(getCanal())}`, {
+  fetch(`${NTFY_BASE}/${encodeURIComponent(cluster.canal)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Title": "Hay público", "Priority": "high", "Tags": "fire" },
     body: JSON.stringify(msg),
   }).then(() => {
-    showToast(`🔥 Aviso enviado${parada ? " en " + parada.nombre : ""}`);
+    showToast(`🔥 Enviado a ${cluster.nombre}`);
   }).catch(() => {
     showToast("⚠️ No se pudo enviar (revisa conexión)");
   });
@@ -324,20 +560,17 @@ function addHayPublico(msg) {
 function limpiarHayPublico() {
   const now = Date.now();
   if (!state.hayPublico) state.hayPublico = [];
-
   const grupos = {};
   state.hayPublico.forEach(a => {
     const key = a.paradaId || `${a.lat.toFixed(3)}_${a.lng.toFixed(3)}`;
     (grupos[key] = grupos[key] || []).push(a);
   });
-
   const expirados = new Set();
   Object.values(grupos).forEach(items => {
     const recientes = items.filter(a => now - a.ts < HAY_PUBLICO_VENTANA_MS);
     const ttl = recientes.length >= HAY_PUBLICO_UMBRAL ? HAY_PUBLICO_TTL_MAX : HAY_PUBLICO_TTL_MIN;
     items.forEach(a => { if (now - a.ts > ttl) expirados.add(a.id); });
   });
-
   const antes = state.hayPublico.length;
   state.hayPublico = state.hayPublico.filter(a => !expirados.has(a.id));
   return antes !== state.hayPublico.length;
@@ -348,16 +581,26 @@ function updateFireMarkers() {
   fireMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
   fireMarkers = [];
 
-  const now = Date.now();
+  // Agrupar por parada o por celda de ~100 m
+  const grupos = {};
   state.hayPublico.forEach(a => {
+    const key = a.paradaId || `${a.lat.toFixed(3)}_${a.lng.toFixed(3)}`;
+    if (!grupos[key]) grupos[key] = { lat: a.lat, lng: a.lng, items: [] };
+    grupos[key].items.push(a);
+  });
+
+  const now = Date.now();
+  Object.values(grupos).forEach(g => {
+    const n = g.items.length;
     const icon = L.divIcon({
       className: "",
-      html: `<div class="fire-icon">🔥</div>`,
+      html: `<div class="fire-icon">🔥${n>1 ? `<span class="fire-count">x${n}</span>` : ""}</div>`,
       iconSize: [30,30], iconAnchor: [15,30],
     });
-    const edad = Math.round((now - a.ts) / 1000);
-    const marcador = L.marker([a.lat, a.lng], { icon, zIndexOffset: 500 }).addTo(map);
-    marcador.bindPopup(`<div style="color:#111"><b>🔥 Hay público</b><br>${a.paradaNombre ? a.paradaNombre+"<br>" : ""}Hace ${edad}s${a.usuario ? " · "+esc(a.usuario) : ""}</div>`);
+    const ultimo = g.items.sort((a,b) => b.ts - a.ts)[0];
+    const edad = Math.round((now - ultimo.ts) / 1000);
+    const marcador = L.marker([g.lat, g.lng], { icon, zIndexOffset: 500 }).addTo(map);
+    marcador.bindPopup(`<div style="color:#111"><b>🔥 Hay público${n>1 ? ` x${n}` : ""}</b><br>${ultimo.paradaNombre ? ultimo.paradaNombre+"<br>" : ""}Hace ${edad}s</div>`);
     fireMarkers.push(marcador);
   });
 }
@@ -380,39 +623,6 @@ function updateTicker() {
   });
   el.classList.remove("hidden");
   el.innerHTML = `<div class="ticker-track">${items.join("     •     ")}</div>`;
-}
-
-async function suscribirHayPublico() {
-  try {
-    const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(getCanal())}/json?poll=1&since=30m`);
-    const texto = await res.text();
-    texto.trim().split("\n").filter(Boolean).forEach(line => {
-      try {
-        const data = JSON.parse(line);
-        if (data.event === "message" && data.message) {
-          const payload = JSON.parse(data.message);
-          if (payload.type === "hayPublico") addHayPublico(payload);
-        }
-      } catch(e){}
-    });
-  } catch(e) { console.warn("No se pudieron cargar avisos recientes:", e); }
-
-  if (sseConnection) { try { sseConnection.close(); } catch(e){} sseConnection = null; }
-  try {
-    sseConnection = new EventSource(`${NTFY_BASE}/${encodeURIComponent(getCanal())}/sse`);
-    sseConnection.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.event === "message" && data.message) {
-          const payload = JSON.parse(data.message);
-          if (payload.type === "hayPublico") addHayPublico(payload);
-        }
-      } catch(err) {}
-    };
-    sseConnection.onerror = () => {};
-  } catch(e) {
-    console.warn("SSE no disponible:", e);
-  }
 }
 
 /* ===================== Render raíz ===================== */
@@ -481,6 +691,8 @@ function renderHome() {
     { id:"dashboard", label:"Panel", emoji:"📊", desc:"Resumen de tu actividad" },
   ];
   const activa = !!state.jornadaActivaId;
+  const clusterActual = getClusterActual();
+  const nZonas = Object.keys(suscripciones).length;
   return `
     <div class="p-4 space-y-4">
       <div class="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-5 text-brand-900">
@@ -495,15 +707,19 @@ function renderHome() {
 
       <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-3 space-y-2">
         <div class="flex items-center justify-between">
-          <div class="text-xs text-neutral-400 font-semibold">📡 Canal de avisos "Hay público"</div>
-          <span class="text-[10px] text-green-500">${sseConnection ? "● en vivo" : "○ sin conexión"}</span>
+          <div class="text-xs text-neutral-400 font-semibold">📡 Red de avisos</div>
+          <span class="text-[10px] ${nZonas > 0 ? 'text-green-500' : 'text-neutral-500'}">● ${nZonas} zona${nZonas===1?"":"s"} conectada${nZonas===1?"":"s"}</span>
         </div>
-        <div class="flex gap-2">
-          <input id="canal-input" value="${esc(state.canalPublico||"")}" placeholder="nombre-del-canal"
-            class="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-          <button id="canal-save" class="rounded-lg bg-brand-500 text-brand-900 px-3 text-sm font-semibold">Guardar</button>
+        ${clusterActual ? `
+          <div class="text-sm text-brand-500 font-semibold">Estás en zona <span class="uppercase">${esc(clusterActual.nombre)}</span></div>
+          <div class="text-[11px] text-neutral-500">${clusterActual.paradas.length} parada${clusterActual.paradas.length===1?"":"s"} · enlace ${esCentro({lat:lastPosition?.lat||0,lng:lastPosition?.lng||0})?"1 km":"5 km"}</div>
+        ` : `<div class="text-[11px] text-neutral-500">Esperando ubicación GPS…</div>`}
+        <div class="flex gap-2 pt-1">
+          <button id="btn-toggle-sonido" class="flex-1 rounded-lg ${state.sonidoActivo ? 'bg-brand-500 text-brand-900' : 'bg-neutral-800 text-neutral-300 border border-neutral-700'} py-1.5 text-xs font-semibold">
+            ${state.sonidoActivo ? "🔔 Avisos activos" : "🔕 Avisos silenciados"}
+          </button>
+          <button id="btn-pedir-notif" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300">Permitir notif.</button>
         </div>
-        <p class="text-[11px] text-neutral-500">Todos los taxis que usen el mismo canal reciben los avisos al instante. Cambia el nombre solo si quieres un grupo privado distinto.</p>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
@@ -526,7 +742,6 @@ function renderHome() {
 function renderJornada() {
   const activa = state.jornadas.find(j => j.id === state.jornadaActivaId);
   const historial = state.jornadas.filter(j => j.endedAt);
-
   const bloque = activa ? `
     <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
       <div class="text-sm text-neutral-400">Iniciada ${formatDateTime(activa.startedAt)}</div>
@@ -539,7 +754,6 @@ function renderJornada() {
       <input id="kmInicio" placeholder="Km inicial (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
       <button id="btn-ini-jornada" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Iniciar jornada</button>
     </div>`;
-
   return `
     <div class="p-4 space-y-4">
       <h2 class="text-lg font-bold">Jornada</h2>
@@ -592,7 +806,7 @@ function renderJornadaResumen(jornada, titulo) {
         <h3 class="text-sm font-semibold text-neutral-300">📊 ${titulo}</h3>
         <span class="text-xs text-neutral-500">${formatDuration(d.duracion)}</span>
       </div>
-      ${sinDatos ? `<p class="text-sm text-neutral-500 text-center py-3">Sin actividad todavía. Registra un servicio o gasto.</p>` : `
+      ${sinDatos ? `<p class="text-sm text-neutral-500 text-center py-3">Sin actividad todavía.</p>` : `
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg bg-gradient-to-br from-brand-500/20 to-brand-600/10 border border-brand-500/30 p-3">
           <div class="text-[10px] text-neutral-400 uppercase tracking-wide">Ingresos</div>
@@ -643,31 +857,18 @@ function initJornadaCharts() {
     const jornada = state.jornadas.find(j => j.id === jornadaId);
     if (!jornada) return;
     const d = getJornadaData(jornada);
-
     const startHour = new Date(jornada.startedAt).getHours();
     const endHour = new Date(jornada.endedAt ?? Date.now()).getHours();
     const horas = [];
     for (let h = startHour; h <= endHour; h++) horas.push(h);
     if (horas.length === 0) horas.push(startHour);
-
-    const ingresosHora = horas.map(h =>
-      d.svcs.filter(s => new Date(s.at).getHours() === h)
-            .reduce((sum, s) => sum + s.importe + s.propina, 0)
-    );
-    const serviciosHora = horas.map(h =>
-      d.svcs.filter(s => new Date(s.at).getHours() === h).length
-    );
-
+    const ingresosHora = horas.map(h => d.svcs.filter(s => new Date(s.at).getHours() === h).reduce((sum, s) => sum + s.importe + s.propina, 0));
+    const serviciosHora = horas.map(h => d.svcs.filter(s => new Date(s.at).getHours() === h).length);
     const chart = new Chart(canvas, {
       type: "bar",
       data: {
         labels: horas.map(h => String(h).padStart(2,"0")+"h"),
-        datasets: [{
-          data: ingresosHora,
-          backgroundColor: "#f5b400",
-          borderRadius: 4,
-          maxBarThickness: 34,
-        }]
+        datasets: [{ data: ingresosHora, backgroundColor: "#f5b400", borderRadius: 4, maxBarThickness: 34 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -693,20 +894,14 @@ function initJornadaCharts() {
     if (!jornada) return;
     const d = getJornadaData(jornada);
     if (d.gst.length === 0) return;
-
     const colores = { combustible:"#f5b400", peaje:"#3b82f6", comida:"#22c55e", parking:"#a855f7", lavado:"#06b6d4", otros:"#888" };
     const tipos = {};
     d.gst.forEach(g => { tipos[g.tipo] = (tipos[g.tipo]||0) + g.importe; });
-
     const chart = new Chart(canvas, {
       type: "doughnut",
       data: {
         labels: Object.keys(tipos).map(t => GASTO_LABEL[t] || t),
-        datasets: [{
-          data: Object.values(tipos),
-          backgroundColor: Object.keys(tipos).map(t => colores[t] || "#888"),
-          borderWidth: 0,
-        }]
+        datasets: [{ data: Object.values(tipos), backgroundColor: Object.keys(tipos).map(t => colores[t] || "#888"), borderWidth: 0 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false, cutout: "62%",
@@ -801,19 +996,15 @@ function renderParadas() {
           <button id="btn-add-parada" class="text-xs rounded-full bg-green-600 px-3 py-1 font-semibold">+ Añadir</button>
         </div>
       </div>
-
       <div class="rounded-xl overflow-hidden border border-neutral-800">
         <div id="map"></div>
       </div>
       <div id="geo-status" class="text-xs text-neutral-500">Pidiendo ubicación…</div>
-
       <input id="paradas-q" placeholder="Buscar por nombre, barrio o municipio…" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-
       <div class="flex items-center justify-between text-xs text-neutral-500">
         <span>${total} paradas (${propias} tuyas)</span>
         <span id="paradas-count"></span>
       </div>
-
       <div class="space-y-2" id="paradas-lista"></div>
       <div id="parada-stats" class="space-y-2"></div>
       <p class="text-xs text-neutral-600">
@@ -840,14 +1031,16 @@ function bindViewEvents() {
   root.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.go; save(); render(); }));
 
   if (state.view === "home") {
-    const btn = document.getElementById("canal-save");
-    if (btn) btn.addEventListener("click", () => {
-      const nuevo = document.getElementById("canal-input").value.trim();
-      if (!nuevo) { showToast("Pon un nombre de canal"); return; }
-      state.canalPublico = nuevo;
-      save();
-      showToast(`📡 Canal: ${nuevo}`);
-      suscribirHayPublico();
+    const btnSonido = document.getElementById("btn-toggle-sonido");
+    if (btnSonido) btnSonido.addEventListener("click", () => {
+      state.sonidoActivo = !state.sonidoActivo;
+      save(); render();
+      if (state.sonidoActivo) beep();
+    });
+    const btnNotif = document.getElementById("btn-pedir-notif");
+    if (btnNotif) btnNotif.addEventListener("click", async () => {
+      await pedirPermisoNotificaciones();
+      showToast(Notification.permission === "granted" ? "🔔 Notificaciones activadas" : "Notificaciones no permitidas");
     });
   }
 
@@ -942,7 +1135,7 @@ function bindViewEvents() {
 
       if (countEl) countEl.textContent = `${filtradas.length} cerca`;
 
-      lista.innerHTML = filtradas.length===0 ? `<p class="text-sm text-neutral-500">No hay paradas a menos de ${NEARBY_RADIUS_M/1000} km.</p>` :
+      lista.innerHTML = filtradas.length===0 ? `<p class="text-sm text-neutral-500">No hay paradas cerca.</p>` :
         filtradas.map(({p, dist}) => {
           const st = proximityState[p.id];
           const activo = st && st.status === "waiting";
@@ -975,7 +1168,7 @@ function bindViewEvents() {
       lista.querySelectorAll("[data-del-parada]").forEach(b => b.addEventListener("click", () => {
         if (!confirm("¿Borrar esta parada que añadiste?")) return;
         state.paradasUsuario = state.paradasUsuario.filter(x => x.id !== b.dataset.delParada);
-        save(); render();
+        save(); recalcularClusters(); render();
       }));
     };
     paint();
@@ -1082,6 +1275,7 @@ function mostrarFormularioParada() {
 
     state.paradasUsuario.push({ id: uid("usr"), nombre, municipio, barrio, plazas, horario, lat, lng });
     save();
+    recalcularClusters();
     modal.remove();
     showToast(`✅ "${nombre}" añadida`);
     render();
@@ -1135,14 +1329,12 @@ function refreshNearbyMarkers() {
     ? todas.filter(p => distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) < NEARBY_RADIUS_M)
     : todas;
   const ids = new Set(cercanas.map(p => p.id));
-
   Object.keys(paradaMarkers).forEach(id => {
     if (!ids.has(id)) {
       try { map.removeLayer(paradaMarkers[id]); } catch(e){}
       delete paradaMarkers[id];
     }
   });
-
   const paradaIcon = L.divIcon({
     className:"",
     html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
@@ -1188,6 +1380,8 @@ function onGeoError(err) {
               err.code === 3 ? "Tiempo de espera agotado." : err.message;
   if (s) s.textContent = `⚠️ ${msg}`;
 }
+
+let ultimoClusterId = null;
 function onPosition(pos) {
   const { latitude: lat, longitude: lng, accuracy } = pos.coords;
   const first = !lastPosition;
@@ -1197,6 +1391,16 @@ function onPosition(pos) {
   if (s) s.textContent = `📍 Precisión ±${Math.round(accuracy)} m · ${formatTime(Date.now())}`;
   checkAllParadas(lat, lng);
   updateWaitingBanner();
+
+  // Gestión de suscripciones a clusters
+  const clusterActual = getClusterActual();
+  const cambioCluster = clusterActual && clusterActual.id !== ultimoClusterId;
+  if (cambioCluster || first) {
+    ultimoClusterId = clusterActual?.id || null;
+    gestionarSuscripciones();
+    if (state.view === "home") render();
+  }
+
   if (state.view === "paradas") {
     if (first && map) map.setView([lat, lng], 15);
     refreshNearbyMarkers();
@@ -1212,13 +1416,11 @@ function checkAllParadas(lat, lng) {
     const d = distanceMeters(lat, lng, p.lat, p.lng);
     let st = proximityState[p.id];
     if (!st) st = proximityState[p.id] = { status:"idle", insideSince:null, anchor:null, lastSeen:null };
-
     if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
       if (state.waitRecords && state.waitRecords[p.id]) state.waitRecords[p.id] = [];
       st = proximityState[p.id] = { status:"idle", insideSince:null, anchor:null, lastSeen:now };
     }
     st.lastSeen = now;
-
     if (st.status === "idle") {
       if (d < RADIO_PREGUNTAR) {
         if (!st.insideSince) { st.insideSince = now; st.anchor = { lat, lng }; }
@@ -1242,7 +1444,6 @@ function checkAllParadas(lat, lng) {
 function askIfAtParada(parada, dist) {
   if (document.getElementById("modal-parada")) return;
   if (state.activeWait) { proximityState[parada.id] = { status:"dismissed", lastSeen: Date.now() }; return; }
-
   const modal = document.createElement("div");
   modal.id = "modal-parada";
   modal.className = "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4";
@@ -1259,7 +1460,6 @@ function askIfAtParada(parada, dist) {
       </div>
     </div>`;
   document.body.appendChild(modal);
-
   document.getElementById("modal-si").addEventListener("click", () => {
     const st = proximityState[parada.id];
     st.status = "waiting";
@@ -1279,9 +1479,7 @@ function finalizarEspera(parada, st) {
   const duration = (endTime - st.startTime) / 1000;
   st.status = "dismissed"; st.startTime = null;
   state.activeWait = null;
-
   if (duration < MIN_DURACION_ESPERA) { save(); updateWaitingBanner(); return; }
-
   if (!state.waitRecords) state.waitRecords = {};
   if (!state.waitRecords[parada.id]) state.waitRecords[parada.id] = [];
   state.waitRecords[parada.id].push({ start: st.startTime, end: endTime, duration });
@@ -1319,7 +1517,6 @@ function renderParadaStats() {
   const ids = Object.keys(records).filter(id => (records[id]||[]).length > 0);
   if (ids.length === 0) { el.innerHTML = ""; return; }
   const todas = getAllParadas();
-
   el.innerHTML = `
     <h3 class="text-sm font-semibold text-neutral-400 mt-2">Tus estadísticas de espera</h3>
     ${ids.map(id => {
@@ -1362,7 +1559,6 @@ setInterval(() => {
     if (a && el) el.textContent = formatDuration((Date.now()-a.startedAt)/1000);
   }
   if (state.activeWait) updateWaitingBanner();
-
   const now = Date.now();
   let changed = false;
   Object.keys(proximityState).forEach(id => {
@@ -1373,7 +1569,6 @@ setInterval(() => {
     }
   });
   if (changed) { save(); if (state.view === "paradas") renderParadaStats(); }
-
   if (Math.floor(now/1000) % 5 === 0) {
     const huboCambios = limpiarHayPublico();
     if (huboCambios) save();
@@ -1384,9 +1579,10 @@ setInterval(() => {
 
 /* ===================== Arranque ===================== */
 load();
+recalcularClusters();
 render();
 initGeolocation();
-suscribirHayPublico();
+if ("Notification" in window && Notification.permission === "granted") { /* ya concedido */ }
 </script>
 </body>
 </html>
