@@ -1,0 +1,71 @@
+/* ============================================================
+   TaxiDiario — Screen Wake Lock
+   © 2026 TaxiDiario. Todos los derechos reservados.
+   ============================================================ */
+
+(function(){
+  let wakeLock = null;
+  let activo = false;
+
+  async function activar() {
+    if (!("wakeLock" in navigator)) {
+      console.warn("[WakeLock] No soportado");
+      return false;
+    }
+    if (activo) return true;
+
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      activo = true;
+
+      wakeLock.addEventListener("release", () => {
+        activo = false;
+        console.log("[WakeLock] Liberado por el sistema");
+      });
+
+      console.log("[WakeLock] Activado ✅");
+      return true;
+    } catch (e) {
+      console.warn("[WakeLock] Error:", e.message);
+      activo = false;
+      return false;
+    }
+  }
+
+  async function desactivar() {
+    if (wakeLock && activo) {
+      try { await wakeLock.release(); } catch(e){}
+      wakeLock = null;
+      activo = false;
+      console.log("[WakeLock] Desactivado");
+    }
+  }
+
+  // Re-adquirir al volver al primer plano (el navegador lo libera al ocultar)
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible" && activo === false) {
+      // Solo re-adquirir si el usuario lo tenía activado
+      const quería = localStorage.getItem("taxidiario-wakelock") === "1";
+      if (quería) await activar();
+    }
+  });
+
+  window.TaxiWakeLock = {
+    activar: async () => {
+      const ok = await activar();
+      if (ok) localStorage.setItem("taxidiario-wakelock", "1");
+      return ok;
+    },
+    desactivar: async () => {
+      await desactivar();
+      localStorage.setItem("taxidiario-wakelock", "0");
+    },
+    estaActivo: () => activo,
+    estaSoportado: () => "wakeLock" in navigator,
+  };
+
+  // Auto-activar si el usuario lo tenía activado antes
+  if (localStorage.getItem("taxidiario-wakelock") === "1" && document.visibilityState === "visible") {
+    activar();
+  }
+})();
