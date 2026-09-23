@@ -8,163 +8,272 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          brand: {
-            50: "#fff8e6", 100: "#ffedb3", 400: "#ffc61a",
-            500: "#f5b400", 600: "#cc9600", 900: "#1a1400",
-          },
-        },
-      },
-    },
+    theme: { extend: { colors: { brand: { 50:"#fff8e6", 100:"#ffedb3", 400:"#ffc61a", 500:"#f5b400", 600:"#cc9600", 900:"#1a1400" } } } },
   };
+</script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+  window.__trysteroPromise = import('https://esm.sh/trystero@0.21.6/nostr')
+    .then(m => m)
+    .catch(e => { console.warn('Trystero no disponible:', e); return null; });
 </script>
 <style>
   html, body, #root { height: 100%; }
-  body {
-    background: #0b0b0d; color: #f5f5f5;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    margin: 0;
-  }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+  body { background:#0b0b0d; color:#f5f5f5; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin:0; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
   input, button { font-family: inherit; }
-  .hidden { display: none !important; }
+  #map { height: 50vh; min-height: 300px; width: 100%; background:#1a1a1d; }
+  .leaflet-container { background:#1a1a1d; }
+  .leaflet-control-attribution { background: rgba(0,0,0,0.5) !important; color:#999 !important; font-size:10px !important; }
+  .leaflet-control-attribution a { color:#bbb !important; }
+  .leaflet-bar { border:none !important; }
+  .leaflet-bar a { background:#1a1a1d !important; color:#f5b400 !important; border-bottom:1px solid #333 !important; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script>
+/* ===================== Configuración ===================== */
+const RADIO_PREGUNTAR      = 150;   // m
+const RADIO_TERMINAR       = 250;   // m (= 150 + 100)
+const MIN_PARADO_SEGUNDOS  = 60;    // debe estar quieto 1 min
+const MOVIMIENTO_MAX_M     = 30;    // se considera "quieto" si no se mueve >30 m
+const MIN_DURACION_ESPERA  = 20;    // s mínimos para guardar una espera
+const RESET_SIN_VISITA_MS  = 30*60*1000; // 30 min → reset registros de esa parada
+const P2P_ENVIO_CADA_MS    = 10000;
+const P2P_PEER_ACTIVO_MS   = 60000;
+const NEARBY_RADIUS_M      = 5000;  // solo mostrar paradas a menos de 5 km
+
 /* ===================== Datos ===================== */
 const PARADAS = [
-  { id: "p1", nombre: "Puerta del Sol", municipio: "Madrid", barrio: "Centro", plazas: 6, horario: "24h" },
-  { id: "p2", nombre: "Estación Atocha", municipio: "Madrid", barrio: "Arganzuela", plazas: 10, horario: "24h" },
-  { id: "p3", nombre: "Aeropuerto T4", municipio: "Madrid", barrio: "Barajas", plazas: 20, horario: "24h" },
-  { id: "p4", nombre: "Plaza España", municipio: "Madrid", barrio: "Moncloa", plazas: 5, horario: "24h" },
-  { id: "p5", nombre: "Gran Vía", municipio: "Madrid", barrio: "Centro", plazas: 4, horario: "06:00-24:00" },
-  { id: "p6", nombre: "Nuevos Ministerios", municipio: "Madrid", barrio: "Chamberí", plazas: 8, horario: "24h" },
+  { id:"p1", nombre:"Puerta del Sol", municipio:"Madrid", barrio:"Centro", plazas:6, horario:"24h", lat:40.4168, lng:-3.7038 },
+  { id:"p2", nombre:"Estación Atocha", municipio:"Madrid", barrio:"Arganzuela", plazas:10, horario:"24h", lat:40.4066, lng:-3.6906 },
+  { id:"p3", nombre:"Aeropuerto T4", municipio:"Madrid", barrio:"Barajas", plazas:20, horario:"24h", lat:40.4936, lng:-3.5668 },
+  { id:"p4", nombre:"Plaza España", municipio:"Madrid", barrio:"Moncloa", plazas:5, horario:"24h", lat:40.4239, lng:-3.7123 },
+  { id:"p5", nombre:"Gran Vía", municipio:"Madrid", barrio:"Centro", plazas:4, horario:"06:00-24:00", lat:40.4203, lng:-3.7058 },
+  { id:"p6", nombre:"Nuevos Ministerios", municipio:"Madrid", barrio:"Chamberí", plazas:8, horario:"24h", lat:40.4464, lng:-3.6931 },
 ];
 
-const PAGO_LABEL = { efectivo: "Efectivo", tarjeta: "Tarjeta", app: "App" };
-const GASTO_LABEL = {
-  combustible: "Combustible", peaje: "Peaje", comida: "Comida",
-  parking: "Parking", lavado: "Lavado", otros: "Otros",
-};
+const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
+const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
+const NAV = [
+  { id:"home", label:"Inicio", emoji:"🏠" },
+  { id:"jornada", label:"Jornada", emoji:"🕒" },
+  { id:"servicios", label:"Servicios", emoji:"🚕" },
+  { id:"gastos", label:"Gastos", emoji:"⛽" },
+  { id:"paradas", label:"Paradas", emoji:"📍" },
+  { id:"dashboard", label:"Panel", emoji:"📊" },
+];
 
 /* ===================== Estado ===================== */
-const STORAGE_KEY = "taxidiario-v1";
-
+const STORAGE_KEY = "taxidiario-v2";
 const state = {
-  view: "home",
-  conductor: "",
-  matricula: "",
-  services: [],
-  gastos: [],
-  jornadas: [],
-  jornadaActivaId: null,
+  view: "home", conductor:"", matricula:"",
+  services: [], gastos: [], jornadas: [], jornadaActivaId:null,
+  waitRecords: {},
+  activeWait: null,
+  p2pRoomName: "",
 };
 
 function load() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) Object.assign(state, JSON.parse(raw)); } catch(e){}
+  if (state.activeWait) {
+    proximityState[state.activeWait.paradaId] = { status:"waiting", startTime: state.activeWait.startTime, lastSeen: Date.now() };
+  }
+  cleanupOldRecords();
+}
+function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
+function uid(p){ return `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`; }
+
+function cleanupOldRecords() {
+  const now = Date.now();
+  if (!state.waitRecords) state.waitRecords = {};
+  Object.keys(proximityState).forEach(id => {
+    const st = proximityState[id];
+    if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
+      delete proximityState[id];
+      if (state.waitRecords[id]) state.waitRecords[id] = [];
+    }
+  });
+}
+
+/* ===================== Formato ===================== */
+const euro = new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"});
+const timeFmt = new Intl.DateTimeFormat("es-ES",{hour:"2-digit",minute:"2-digit"});
+const dateTimeFmt = new Intl.DateTimeFormat("es-ES",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+const formatEuro = n => euro.format(n||0);
+const formatTime = ts => timeFmt.format(ts);
+const formatDateTime = ts => dateTimeFmt.format(ts);
+function formatDuration(totalSec){
+  const s = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  if (h>0) return `${h}h ${String(m).padStart(2,"0")}m`;
+  if (m>0) return `${m}m ${String(sec).padStart(2,"0")}s`;
+  return `${sec}s`;
+}
+function startOfDay(ts=Date.now()){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
+function startOfWeek(ts=Date.now()){ const d=new Date(startOfDay(ts)); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.getTime(); }
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ===================== Geo utilidades ===================== */
+function distanceMeters(lat1,lon1,lat2,lon2){
+  const R=6371000, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+/* ===================== Estado de proximidad ===================== */
+const proximityState = {};
+
+/* ===================== P2P (Trystero / Nostr) ===================== */
+const p2p = {
+  active:false, room:null, roomName:"",
+  sendPos:null, sendStatus:null,
+  peers:new Map(),
+  peerMarkers:new Map(),
+  interval:null,
+};
+
+async function joinP2P(roomName) {
+  if (!roomName) { showToast("Pon un nombre de sala (ej: madrid-centro)"); return false; }
+  const m = await window.__trysteroPromise;
+  if (!m || !m.joinRoom) { showToast("⚠️ Red P2P no disponible (revisa conexión)"); return false; }
+
+  if (p2p.room) { try { p2p.room.leave(); } catch(e){} }
+  if (p2p.interval) clearInterval(p2p.interval);
+  p2p.peers.clear();
+  p2p.peerMarkers.forEach(mk => { try { map && map.removeLayer(mk); } catch(e){} });
+  p2p.peerMarkers.clear();
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) Object.assign(state, JSON.parse(raw));
-  } catch (e) { console.warn("No se pudo cargar el estado:", e); }
-}
-function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-  catch (e) { console.warn("No se pudo guardar:", e); }
-}
-function uid(prefix) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    p2p.room = m.joinRoom({ appId: "taxidiario-p2p-v1" }, roomName);
+  } catch(e) {
+    showToast("⚠️ No se pudo entrar a la sala");
+    return false;
+  }
+  p2p.roomName = roomName;
+  state.p2pRoomName = roomName;
+  save();
+
+  const [sendPos, getPos]       = p2p.room.makeAction("pos");
+  const [sendStatus, getStatus] = p2p.room.makeAction("status");
+  p2p.sendPos = sendPos;
+  p2p.sendStatus = sendStatus;
+
+  getPos((data, peerId) => {
+    const p = p2p.peers.get(peerId) || {};
+    Object.assign(p, { lat:data.lat, lng:data.lng, acc:data.acc, name:data.name, lastUpdate:Date.now() });
+    p2p.peers.set(peerId, p);
+    if (state.view === "paradas") renderParadaStats();
+  });
+  getStatus((data, peerId) => {
+    const p = p2p.peers.get(peerId) || {};
+    Object.assign(p, { paradaId:data.paradaId, waitingSince:data.waitingSince, lastUpdate:Date.now() });
+    p2p.peers.set(peerId, p);
+    if (state.view === "paradas") renderParadaStats();
+  });
+
+  p2p.room.onPeerJoin(peerId => { broadcastPosition(); });
+  p2p.room.onPeerLeave(peerId => {
+    p2p.peers.delete(peerId);
+    if (state.view === "paradas") renderParadaStats();
+  });
+
+  p2p.active = true;
+  p2p.interval = setInterval(broadcastPosition, P2P_ENVIO_CADA_MS);
+  broadcastPosition();
+  showToast(`📡 Conectado a "${roomName}"`);
+  if (state.view === "paradas") render();
+  return true;
 }
 
-/* ===================== Utilidades de formato ===================== */
-const euro = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
-const timeFmt = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" });
-const dateTimeFmt = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-
-const formatEuro = (n) => euro.format(n || 0);
-const formatTime = (ts) => timeFmt.format(ts);
-const formatDateTime = (ts) => dateTimeFmt.format(ts);
-function formatDuration(totalSec) {
-  const sec = Math.max(0, Math.floor(totalSec));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
-}
-function startOfDay(ts = Date.now()) {
-  const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime();
-}
-function startOfWeek(ts = Date.now()) {
-  const d = new Date(startOfDay(ts));
-  const day = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - day);
-  return d.getTime();
+function leaveP2P() {
+  if (p2p.room) { try { p2p.room.leave(); } catch(e){} }
+  if (p2p.interval) clearInterval(p2p.interval);
+  p2p.peerMarkers.clear();
+  p2p.peers.clear();
+  p2p.active = false;
+  p2p.room = null;
+  p2p.interval = null;
+  showToast("📴 Desconectado de la red");
+  if (state.view === "paradas") render();
 }
 
-/* ===================== Escapar HTML ===================== */
-function esc(str) {
-  return String(str ?? "").replace(/[&<>"']/g, (c) => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
-  ));
+function broadcastPosition() {
+  if (!p2p.active || !p2p.sendPos) return;
+  if (lastPosition) {
+    p2p.sendPos({
+      lat: lastPosition.lat, lng: lastPosition.lng,
+      acc: Math.round(lastPosition.accuracy || 0),
+      name: state.conductor || "Taxi",
+    }).catch(()=>{});
+  }
+  if (p2p.sendStatus) {
+    p2p.sendStatus({
+      paradaId: state.activeWait?.paradaId || null,
+      waitingSince: state.activeWait?.startTime || null,
+    }).catch(()=>{});
+  }
 }
 
-/* ===================== Render principal ===================== */
+// Ya NO se dibujan otros taxis en el mapa. Solo contador anónimo.
+function updatePeersOnMap() {
+  p2p.peerMarkers.forEach((mk) => { try { map && map.removeLayer(mk); } catch(e){} });
+  p2p.peerMarkers.clear();
+}
+
+function peersEnParada(paradaId) {
+  const now = Date.now();
+  let n = 0;
+  p2p.peers.forEach(p => {
+    if (p.paradaId === paradaId && now - p.lastUpdate < P2P_PEER_ACTIVO_MS) n++;
+  });
+  return n;
+}
+
+/* ===================== Filtro de paradas cercanas ===================== */
+function getParadasCercanas() {
+  if (!lastPosition) return PARADAS;
+  return PARADAS.filter(p => distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) < NEARBY_RADIUS_M);
+}
+
+/* ===================== Render ===================== */
 const root = document.getElementById("root");
 
 function render() {
-  const views = {
-    home: renderHome,
-    jornada: renderJornada,
-    servicios: renderServicios,
-    gastos: renderGastos,
-    paradas: renderParadas,
-    dashboard: renderDashboard,
-  };
+  const views = { home:renderHome, jornada:renderJornada, servicios:renderServicios, gastos:renderGastos, paradas:renderParadas, dashboard:renderDashboard };
   const renderView = views[state.view] || renderHome;
 
   root.innerHTML = `
-    <div class="min-h-screen flex flex-col max-w-md mx-auto">
+    <div class="min-h-screen flex flex-col max-w-md mx-auto relative">
+      <div id="waiting-banner" class="hidden"></div>
       <main class="flex-1 pb-20 overflow-y-auto" id="main-view"></main>
-      <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-5">
-        ${NAV.map((n) => `
-          <button data-nav="${n.id}" class="flex flex-col items-center justify-center py-2 text-[11px] gap-0.5 ${state.view === n.id ? "text-brand-500" : "text-neutral-500"}">
+      <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-6">
+        ${NAV.map(n => `
+          <button data-nav="${n.id}" class="flex flex-col items-center justify-center py-2 text-[10px] gap-0.5 ${state.view===n.id?"text-brand-500":"text-neutral-500"}">
             <span class="text-lg">${n.emoji}</span>${n.label}
-          </button>
-        `).join("")}
+          </button>`).join("")}
       </nav>
     </div>
   `;
-
   document.getElementById("main-view").innerHTML = renderView();
-
-  // listeners de navegación
-  root.querySelectorAll("[data-nav]").forEach((btn) => {
-    btn.addEventListener("click", () => { state.view = btn.dataset.nav; save(); render(); });
-  });
-
-  // listeners específicos de cada vista
+  root.querySelectorAll("[data-nav]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.nav; save(); render(); }));
   bindViewEvents();
+  updateWaitingBanner();
 }
 
-const NAV = [
-  { id: "home", label: "Inicio", emoji: "🏠" },
-  { id: "jornada", label: "Jornada", emoji: "🕒" },
-  { id: "servicios", label: "Servicios", emoji: "🚕" },
-  { id: "gastos", label: "Gastos", emoji: "⛽" },
-  { id: "dashboard", label: "Panel", emoji: "📊" },
-];
-
-/* ===================== Vistas ===================== */
+/* ---------- Home ---------- */
 function renderHome() {
   const CARDS = [
-    { id: "jornada", label: "Jornada", emoji: "🕒", desc: "Inicia o cierra tu turno" },
-    { id: "servicios", label: "Servicios", emoji: "🚕", desc: "Registra cada carrera" },
-    { id: "gastos", label: "Gastos", emoji: "⛽", desc: "Combustible, peajes y más" },
-    { id: "paradas", label: "Paradas", emoji: "📍", desc: "Consulta paradas de taxi" },
-    { id: "dashboard", label: "Panel", emoji: "📊", desc: "Resumen de tu actividad" },
+    { id:"jornada", label:"Jornada", emoji:"🕒", desc:"Inicia o cierra tu turno" },
+    { id:"servicios", label:"Servicios", emoji:"🚕", desc:"Registra cada carrera" },
+    { id:"gastos", label:"Gastos", emoji:"⛽", desc:"Combustible, peajes y más" },
+    { id:"paradas", label:"Paradas", emoji:"📍", desc:"Mapa y tiempos de espera" },
+    { id:"dashboard", label:"Panel", emoji:"📊", desc:"Resumen de tu actividad" },
   ];
   const activa = !!state.jornadaActivaId;
   return `
@@ -174,47 +283,37 @@ function renderHome() {
         <h1 class="text-2xl font-bold mt-1">${state.conductor ? "Hola, " + esc(state.conductor) : "Bienvenido"}</h1>
         ${state.matricula ? `<p class="text-sm opacity-80 mt-0.5">Matrícula ${esc(state.matricula)}</p>` : ""}
         <div class="mt-3 inline-flex items-center gap-2 rounded-full bg-black/10 px-3 py-1 text-xs font-semibold">
-          <span class="h-2 w-2 rounded-full ${activa ? "bg-green-600" : "bg-black/40"}"></span>
+          <span class="h-2 w-2 rounded-full ${activa?"bg-green-600":"bg-black/40"}"></span>
           ${activa ? "Jornada activa" : "Sin jornada activa"}
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
-        ${CARDS.map((c) => `
+        ${CARDS.map(c => `
           <button data-go="${c.id}" class="text-left rounded-xl bg-neutral-900 border border-neutral-800 p-4 hover:border-brand-500 transition-colors">
             <div class="text-2xl">${c.emoji}</div>
             <div class="mt-2 font-semibold">${c.label}</div>
             <div class="text-xs text-neutral-400 mt-0.5">${c.desc}</div>
-          </button>
-        `).join("")}
+          </button>`).join("")}
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
+/* ---------- Jornada ---------- */
 function renderJornada() {
-  const activa = state.jornadas.find((j) => j.id === state.jornadaActivaId);
-  const historial = state.jornadas.filter((j) => j.endedAt);
-
-  let bloque;
-  if (activa) {
-    bloque = `
-      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
-        <div class="text-sm text-neutral-400">Iniciada ${formatDateTime(activa.startedAt)}</div>
-        <div class="text-2xl font-bold" id="cronometro">${formatDuration((Date.now() - activa.startedAt) / 1000)}</div>
-        <input id="kmFin" placeholder="Km final (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        <button id="btn-fin-jornada" class="w-full rounded-lg bg-red-600 hover:bg-red-500 py-2 font-semibold">Finalizar jornada</button>
-      </div>
-    `;
-  } else {
-    bloque = `
-      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
-        <p class="text-sm text-neutral-400">No tienes ninguna jornada activa.</p>
-        <input id="kmInicio" placeholder="Km inicial (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        <button id="btn-ini-jornada" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Iniciar jornada</button>
-      </div>
-    `;
-  }
-
+  const activa = state.jornadas.find(j => j.id === state.jornadaActivaId);
+  const historial = state.jornadas.filter(j => j.endedAt);
+  const bloque = activa ? `
+    <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+      <div class="text-sm text-neutral-400">Iniciada ${formatDateTime(activa.startedAt)}</div>
+      <div class="text-2xl font-bold" id="cronometro">${formatDuration((Date.now()-activa.startedAt)/1000)}</div>
+      <input id="kmFin" placeholder="Km final (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+      <button id="btn-fin-jornada" class="w-full rounded-lg bg-red-600 hover:bg-red-500 py-2 font-semibold">Finalizar jornada</button>
+    </div>` : `
+    <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+      <p class="text-sm text-neutral-400">No tienes ninguna jornada activa.</p>
+      <input id="kmInicio" placeholder="Km inicial (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+      <button id="btn-ini-jornada" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Iniciar jornada</button>
+    </div>`;
   return `
     <div class="p-4 space-y-4">
       <h2 class="text-lg font-bold">Jornada</h2>
@@ -222,23 +321,21 @@ function renderJornada() {
       <div>
         <h3 class="text-sm font-semibold text-neutral-400 mb-2">Historial</h3>
         <div class="space-y-2">
-          ${historial.length === 0
-            ? `<p class="text-sm text-neutral-500">Aún no hay jornadas finalizadas.</p>`
-            : historial.map((j) => `
+          ${historial.length===0 ? `<p class="text-sm text-neutral-500">Aún no hay jornadas finalizadas.</p>` :
+            historial.map(j => `
               <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between">
                 <div>
                   <div class="font-medium">${formatDateTime(j.startedAt)}</div>
-                  <div class="text-neutral-500 text-xs">${j.kmInicio != null && j.kmFin != null ? (j.kmFin - j.kmInicio) + " km" : ""}</div>
+                  <div class="text-neutral-500 text-xs">${j.kmInicio!=null && j.kmFin!=null ? (j.kmFin-j.kmInicio)+" km" : ""}</div>
                 </div>
-                <div class="text-neutral-400">${formatDuration(((j.endedAt ?? 0) - j.startedAt) / 1000)}</div>
-              </div>`).join("")
-          }
+                <div class="text-neutral-400">${formatDuration(((j.endedAt??0)-j.startedAt)/1000)}</div>
+              </div>`).join("")}
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
+/* ---------- Servicios ---------- */
 function renderServicios() {
   return `
     <div class="p-4 space-y-4">
@@ -254,49 +351,44 @@ function renderServicios() {
           <input id="srv-pax" placeholder="Pax" inputmode="numeric" value="1" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
         </div>
         <div class="flex gap-2" id="srv-pago-group">
-          ${["efectivo", "tarjeta", "app"].map((p, i) => `
-            <button data-pago="${p}" class="flex-1 rounded-lg py-2 text-sm font-medium border ${i === 0 ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}">${PAGO_LABEL[p]}</button>
-          `).join("")}
+          ${["efectivo","tarjeta","app"].map((p,i)=>`
+            <button data-pago="${p}" class="flex-1 rounded-lg py-2 text-sm font-medium border ${i===0?"bg-brand-500 text-brand-900 border-brand-500":"bg-neutral-800 border-neutral-700 text-neutral-300"}">${PAGO_LABEL[p]}</button>`).join("")}
         </div>
         <button id="btn-add-srv" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Guardar servicio</button>
       </div>
       <div class="space-y-2">
-        ${state.services.length === 0
-          ? `<p class="text-sm text-neutral-500">Aún no hay servicios registrados.</p>`
-          : state.services.map((s) => `
+        ${state.services.length===0 ? `<p class="text-sm text-neutral-500">Aún no hay servicios registrados.</p>` :
+          state.services.map(s => `
             <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between items-start">
               <div>
                 <div class="font-medium">${esc(s.origen)} → ${esc(s.destino)}</div>
                 <div class="text-neutral-500 text-xs mt-0.5">${formatTime(s.at)} · ${PAGO_LABEL[s.pago]} · ${s.pasajeros} pax</div>
               </div>
               <div class="text-right">
-                <div class="font-semibold">${formatEuro(s.importe + s.propina)}</div>
+                <div class="font-semibold">${formatEuro(s.importe+s.propina)}</div>
                 <button data-del-srv="${s.id}" class="text-xs text-red-400 mt-1">Eliminar</button>
               </div>
-            </div>`).join("")
-        }
+            </div>`).join("")}
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
+/* ---------- Gastos ---------- */
 function renderGastos() {
   return `
     <div class="p-4 space-y-4">
       <h2 class="text-lg font-bold">Gastos</h2>
       <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
         <div class="grid grid-cols-3 gap-2" id="gasto-tipo-group">
-          ${Object.keys(GASTO_LABEL).map((t, i) => `
-            <button data-gasto="${t}" class="rounded-lg py-2 text-xs font-medium border ${i === 0 ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}">${GASTO_LABEL[t]}</button>
-          `).join("")}
+          ${Object.keys(GASTO_LABEL).map((t,i)=>`
+            <button data-gasto="${t}" class="rounded-lg py-2 text-xs font-medium border ${i===0?"bg-brand-500 text-brand-900 border-brand-500":"bg-neutral-800 border-neutral-700 text-neutral-300"}">${GASTO_LABEL[t]}</button>`).join("")}
         </div>
         <input id="gasto-importe" placeholder="Importe €" inputmode="decimal" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
         <button id="btn-add-gasto" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Guardar gasto</button>
       </div>
       <div class="space-y-2">
-        ${state.gastos.length === 0
-          ? `<p class="text-sm text-neutral-500">Aún no hay gastos registrados.</p>`
-          : state.gastos.map((g) => `
+        ${state.gastos.length===0 ? `<p class="text-sm text-neutral-500">Aún no hay gastos registrados.</p>` :
+          state.gastos.map(g => `
             <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between items-center">
               <div>
                 <div class="font-medium">${GASTO_LABEL[g.tipo]}</div>
@@ -306,204 +398,507 @@ function renderGastos() {
                 <div class="font-semibold">${formatEuro(g.importe)}</div>
                 <button data-del-gasto="${g.id}" class="text-xs text-red-400 mt-1">Eliminar</button>
               </div>
-            </div>`).join("")
-        }
+            </div>`).join("")}
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
+/* ---------- Paradas (mapa + geolocalización + P2P anónimo) ---------- */
 function renderParadas() {
+  const p2pOn = p2p.active;
+  const nPeers = Array.from(p2p.peers.values()).filter(p => Date.now() - p.lastUpdate < P2P_PEER_ACTIVO_MS).length;
+  const nCercanas = getParadasCercanas().length;
   return `
     <div class="p-4 space-y-4">
-      <h2 class="text-lg font-bold">Paradas</h2>
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold">Paradas</h2>
+        <button id="btn-centrar" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">📍 Centrar</button>
+      </div>
+
+      <div class="rounded-xl bg-neutral-900 border ${p2pOn?"border-green-600":"border-neutral-800"} p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-sm font-semibold flex items-center gap-2">
+            <span class="h-2 w-2 rounded-full ${p2pOn?"bg-green-500 animate-pulse":"bg-neutral-600"}"></span>
+            Red P2P ${p2pOn ? `· ${nPeers} ${nPeers===1?"taxi":"taxis"} en la sala` : "· desconectado"}
+          </div>
+          ${p2pOn ? `<button id="btn-p2p-leave" class="text-xs text-red-400">Salir</button>` : ""}
+        </div>
+        ${!p2pOn ? `
+          <div class="flex gap-2">
+            <input id="p2p-room" placeholder="Sala (ej: madrid-centro)" value="${esc(state.p2pRoomName||"")}" class="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+            <button id="btn-p2p-join" class="rounded-lg bg-green-600 hover:bg-green-500 px-3 text-sm font-semibold">Entrar</button>
+          </div>
+          <p class="text-[11px] text-neutral-500">Sirve solo para ver cuántos taxis hay en cada parada. No se muestran posiciones ni identidades.</p>
+        ` : `
+          <p class="text-[11px] text-neutral-500">Sala: <b>${esc(p2p.roomName)}</b> · anónimo. Solo se comparte si estás en una parada.</p>
+        `}
+      </div>
+
+      <div class="rounded-xl overflow-hidden border border-neutral-800">
+        <div id="map"></div>
+      </div>
+      <div id="geo-status" class="text-xs text-neutral-500"></div>
       <input id="paradas-q" placeholder="Buscar parada, barrio..." class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+      <div class="text-xs text-neutral-500">${nCercanas} parada${nCercanas===1?"":"s"} a menos de ${NEARBY_RADIUS_M/1000} km</div>
       <div class="space-y-2" id="paradas-lista"></div>
-      <p class="text-xs text-neutral-600">Lista de ejemplo — edítala en el array <code>PARADAS</code> dentro del propio HTML.</p>
-    </div>
-  `;
+      <div id="parada-stats" class="space-y-2"></div>
+      <p class="text-xs text-neutral-600">
+        Pregunta tras 1 min parado en un radio de ${RADIO_PREGUNTAR} m · Cierra la espera al superar ${RADIO_TERMINAR} m · Resetea registros tras 30 min sin visitar.
+      </p>
+    </div>`;
 }
 
+/* ---------- Panel ---------- */
 function renderDashboard() {
   return `
     <div class="p-4 space-y-4">
       <h2 class="text-lg font-bold">Panel</h2>
       <div class="flex gap-2" id="rango-group">
-        ${["hoy", "semana", "total"].map((r, i) => `
-          <button data-rango="${r}" class="flex-1 rounded-lg py-2 text-sm font-medium border capitalize ${i === 0 ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}">${r}</button>
-        `).join("")}
+        ${["hoy","semana","total"].map((r,i)=>`
+          <button data-rango="${r}" class="flex-1 rounded-lg py-2 text-sm font-medium border capitalize ${i===0?"bg-brand-500 text-brand-900 border-brand-500":"bg-neutral-800 border-neutral-700 text-neutral-300"}">${r}</button>`).join("")}
       </div>
       <div class="grid grid-cols-2 gap-3" id="panel-stats"></div>
-    </div>
-  `;
+    </div>`;
 }
 
-/* ===================== Listeners según vista ===================== */
+/* ===================== Listeners ===================== */
 function bindViewEvents() {
-  // Home: tarjetas de navegación
-  root.querySelectorAll("[data-go]").forEach((btn) => {
-    btn.addEventListener("click", () => { state.view = btn.dataset.go; save(); render(); });
-  });
+  root.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.go; save(); render(); }));
 
   if (state.view === "jornada") {
-    const btnIni = document.getElementById("btn-ini-jornada");
-    if (btnIni) btnIni.addEventListener("click", () => {
+    const ini = document.getElementById("btn-ini-jornada");
+    if (ini) ini.addEventListener("click", () => {
       const km = document.getElementById("kmInicio").value;
-      const j = { id: uid("jor"), startedAt: Date.now(), kmInicio: km ? Number(km) : undefined, notas: "" };
-      state.jornadas.unshift(j);
-      state.jornadaActivaId = j.id;
-      save(); render();
+      const j = { id: uid("jor"), startedAt: Date.now(), kmInicio: km?Number(km):undefined, notas:"" };
+      state.jornadas.unshift(j); state.jornadaActivaId = j.id; save(); render();
     });
-    const btnFin = document.getElementById("btn-fin-jornada");
-    if (btnFin) btnFin.addEventListener("click", () => {
+    const fin = document.getElementById("btn-fin-jornada");
+    if (fin) fin.addEventListener("click", () => {
       const km = document.getElementById("kmFin").value;
-      const id = state.jornadaActivaId;
-      if (!id) return;
-      state.jornadas = state.jornadas.map((j) => j.id === id
-        ? { ...j, endedAt: Date.now(), kmFin: km ? Number(km) : j.kmFin }
-        : j);
-      state.jornadaActivaId = null;
-      save(); render();
+      const id = state.jornadaActivaId; if (!id) return;
+      state.jornadas = state.jornadas.map(j => j.id===id ? { ...j, endedAt:Date.now(), kmFin: km?Number(km):j.kmFin } : j);
+      state.jornadaActivaId = null; save(); render();
     });
   }
 
   if (state.view === "servicios") {
-    let pagoSeleccionado = "efectivo";
-    root.querySelectorAll("#srv-pago-group [data-pago]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        pagoSeleccionado = btn.dataset.pago;
-        root.querySelectorAll("#srv-pago-group [data-pago]").forEach((b) => {
-          const active = b.dataset.pago === pagoSeleccionado;
-          b.className = `flex-1 rounded-lg py-2 text-sm font-medium border ${active ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
-        });
+    let pagoSel = "efectivo";
+    root.querySelectorAll("#srv-pago-group [data-pago]").forEach(b => b.addEventListener("click", () => {
+      pagoSel = b.dataset.pago;
+      root.querySelectorAll("#srv-pago-group [data-pago]").forEach(x => {
+        const a = x.dataset.pago === pagoSel;
+        x.className = `flex-1 rounded-lg py-2 text-sm font-medium border ${a?"bg-brand-500 text-brand-900 border-brand-500":"bg-neutral-800 border-neutral-700 text-neutral-300"}`;
       });
-    });
+    }));
     document.getElementById("btn-add-srv").addEventListener("click", () => {
-      const importe = Number(document.getElementById("srv-importe").value) || 0;
-      if (!importe) return;
-      const s = {
+      const importe = Number(document.getElementById("srv-importe").value)||0; if(!importe) return;
+      state.services.unshift({
         id: uid("srv"), at: Date.now(),
-        origen: document.getElementById("srv-origen").value.trim() || "—",
-        destino: document.getElementById("srv-destino").value.trim() || "—",
-        importe,
-        propina: Number(document.getElementById("srv-propina").value) || 0,
-        pago: pagoSeleccionado,
-        minutos: 0,
-        pasajeros: Number(document.getElementById("srv-pax").value) || 1,
-        notas: "",
-        jornadaId: state.jornadaActivaId || undefined,
-      };
-      state.services.unshift(s);
+        origen: document.getElementById("srv-origen").value.trim()||"—",
+        destino: document.getElementById("srv-destino").value.trim()||"—",
+        importe, propina: Number(document.getElementById("srv-propina").value)||0,
+        pago: pagoSel, minutos:0,
+        pasajeros: Number(document.getElementById("srv-pax").value)||1,
+        notas:"", jornadaId: state.jornadaActivaId||undefined,
+      });
       save(); render();
     });
-    root.querySelectorAll("[data-del-srv]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.services = state.services.filter((s) => s.id !== btn.dataset.delSrv);
-        save(); render();
-      });
-    });
+    root.querySelectorAll("[data-del-srv]").forEach(b => b.addEventListener("click", () => {
+      state.services = state.services.filter(s => s.id!==b.dataset.delSrv); save(); render();
+    }));
   }
 
   if (state.view === "gastos") {
-    let tipoSeleccionado = "combustible";
-    root.querySelectorAll("#gasto-tipo-group [data-gasto]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        tipoSeleccionado = btn.dataset.gasto;
-        root.querySelectorAll("#gasto-tipo-group [data-gasto]").forEach((b) => {
-          const active = b.dataset.gasto === tipoSeleccionado;
-          b.className = `rounded-lg py-2 text-xs font-medium border ${active ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
-        });
+    let tipoSel = "combustible";
+    root.querySelectorAll("#gasto-tipo-group [data-gasto]").forEach(b => b.addEventListener("click", () => {
+      tipoSel = b.dataset.gasto;
+      root.querySelectorAll("#gasto-tipo-group [data-gasto]").forEach(x => {
+        const a = x.dataset.gasto === tipoSel;
+        x.className = `rounded-lg py-2 text-xs font-medium border ${a?"bg-brand-500 text-brand-900 border-brand-500":"bg-neutral-800 border-neutral-700 text-neutral-300"}`;
       });
-    });
+    }));
     document.getElementById("btn-add-gasto").addEventListener("click", () => {
-      const importe = Number(document.getElementById("gasto-importe").value) || 0;
-      if (!importe) return;
-      state.gastos.unshift({
-        id: uid("gst"), at: Date.now(),
-        tipo: tipoSeleccionado, importe, notas: "",
-        jornadaId: state.jornadaActivaId || undefined,
-      });
+      const importe = Number(document.getElementById("gasto-importe").value)||0; if(!importe) return;
+      state.gastos.unshift({ id: uid("gst"), at: Date.now(), tipo:tipoSel, importe, notas:"", jornadaId: state.jornadaActivaId||undefined });
       save(); render();
     });
-    root.querySelectorAll("[data-del-gasto]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.gastos = state.gastos.filter((g) => g.id !== btn.dataset.delGasto);
-        save(); render();
-      });
-    });
+    root.querySelectorAll("[data-del-gasto]").forEach(b => b.addEventListener("click", () => {
+      state.gastos = state.gastos.filter(g => g.id!==b.dataset.delGasto); save(); render();
+    }));
   }
 
   if (state.view === "paradas") {
+    initMap();
+
+    const btnJoin = document.getElementById("btn-p2p-join");
+    if (btnJoin) btnJoin.addEventListener("click", async () => {
+      const name = document.getElementById("p2p-room").value.trim();
+      await joinP2P(name);
+    });
+    const btnLeave = document.getElementById("btn-p2p-leave");
+    if (btnLeave) btnLeave.addEventListener("click", () => leaveP2P());
+
     const input = document.getElementById("paradas-q");
     const lista = document.getElementById("paradas-lista");
-    const paint = (q = "") => {
-      const filtered = PARADAS.filter((p) =>
-        `${p.nombre} ${p.barrio} ${p.municipio}`.toLowerCase().includes(q.toLowerCase())
-      );
-      lista.innerHTML = filtered.length === 0
-        ? `<p class="text-sm text-neutral-500">Sin resultados.</p>`
-        : filtered.map((p) => `
-          <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3">
-            <div class="font-medium">${esc(p.nombre)}</div>
-            <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}</div>
-            <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
-          </div>`).join("");
+    const paint = (q="") => {
+      const cercanas = getParadasCercanas();
+      const filtered = cercanas.filter(p => `${p.nombre} ${p.barrio} ${p.municipio}`.toLowerCase().includes(q.toLowerCase()));
+      lista.innerHTML = filtered.length===0 ? `<p class="text-sm text-neutral-500">Sin paradas cerca.</p>` :
+        filtered.map(p => {
+          const st = proximityState[p.id];
+          const activo = st && st.status === "waiting";
+          const peers = peersEnParada(p.id);
+          const dist = lastPosition ? Math.round(distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng)) : null;
+          return `
+            <div class="rounded-lg bg-neutral-900 border ${activo?"border-brand-500":"border-neutral-800"} p-3">
+              <div class="flex justify-between items-start gap-2">
+                <div class="flex-1">
+                  <div class="font-medium flex items-center gap-2 flex-wrap">
+                    ${activo?"⏱️ ":""}${esc(p.nombre)}
+                    ${peers>0?`<span class="text-[10px] rounded-full bg-green-600/20 text-green-400 px-2 py-0.5">${peers} taxi${peers>1?"s":""}</span>`:""}
+                  </div>
+                  <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist} m`:""}</div>
+                  <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
+                </div>
+                <button data-ir-parada="${p.id}" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">Ir</button>
+              </div>
+            </div>`;
+        }).join("");
+      lista.querySelectorAll("[data-ir-parada]").forEach(b => b.addEventListener("click", () => {
+        const p = PARADAS.find(x => x.id === b.dataset.irParada);
+        if (p && map) map.setView([p.lat, p.lng], 17);
+      }));
     };
     paint();
     input.addEventListener("input", () => paint(input.value));
+    document.getElementById("btn-centrar").addEventListener("click", () => {
+      if (lastPosition && map) map.setView([lastPosition.lat, lastPosition.lng], 16);
+      else initGeolocation();
+    });
+    renderParadaStats();
   }
 
   if (state.view === "dashboard") {
     let rango = "hoy";
-    const statsEl = document.getElementById("panel-stats");
+    const el = document.getElementById("panel-stats");
     const paint = () => {
-      const since = rango === "hoy" ? startOfDay() : rango === "semana" ? startOfWeek() : 0;
-      const svc = state.services.filter((s) => s.at >= since);
-      const gst = state.gastos.filter((g) => g.at >= since);
-      const ingresos = svc.reduce((sum, s) => sum + s.importe + s.propina, 0);
-      const gastosTotal = gst.reduce((sum, g) => sum + g.importe, 0);
-      const neto = ingresos - gastosTotal;
-      const media = svc.length ? ingresos / svc.length : 0;
-
-      const stat = (label, value, accent, full) => `
-        <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 ${full ? "col-span-2" : ""}">
-          <div class="text-xs text-neutral-500">${label}</div>
-          <div class="text-xl font-bold mt-1 ${accent ? "text-brand-500" : ""}">${value}</div>
-        </div>`;
-
-      statsEl.innerHTML =
-        stat("Ingresos", formatEuro(ingresos), true) +
-        stat("Gastos", formatEuro(gastosTotal)) +
-        stat("Neto", formatEuro(neto), true) +
-        stat("Servicios", String(svc.length)) +
-        stat("Media/servicio", formatEuro(media), false, true);
+      const since = rango==="hoy"?startOfDay():rango==="semana"?startOfWeek():0;
+      const svc = state.services.filter(s => s.at>=since);
+      const gst = state.gastos.filter(g => g.at>=since);
+      const ingresos = svc.reduce((s,x)=>s+x.importe+x.propina,0);
+      const gastosTot = gst.reduce((s,x)=>s+x.importe,0);
+      const neto = ingresos - gastosTot;
+      const media = svc.length ? ingresos/svc.length : 0;
+      const stat = (l,v,acc,full) => `<div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 ${full?"col-span-2":""}">
+        <div class="text-xs text-neutral-500">${l}</div><div class="text-xl font-bold mt-1 ${acc?"text-brand-500":""}">${v}</div></div>`;
+      el.innerHTML = stat("Ingresos",formatEuro(ingresos),true)+stat("Gastos",formatEuro(gastosTot))+
+                     stat("Neto",formatEuro(neto),true)+stat("Servicios",String(svc.length))+
+                     stat("Media/servicio",formatEuro(media),false,true);
     };
     paint();
-    root.querySelectorAll("#rango-group [data-rango]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        rango = btn.dataset.rango;
-        root.querySelectorAll("#rango-group [data-rango]").forEach((b) => {
-          const active = b.dataset.rango === rango;
-          b.className = `flex-1 rounded-lg py-2 text-sm font-medium border capitalize ${active ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
-        });
-        paint();
+    root.querySelectorAll("#rango-group [data-rango]").forEach(b => b.addEventListener("click", () => {
+      rango = b.dataset.rango;
+      root.querySelectorAll("#rango-group [data-rango]").forEach(x => {
+        const a = x.dataset.rango === rango;
+        x.className = `flex-1 rounded-lg py-2 text-sm font-medium border capitalize ${a?"bg-brand-500 text-brand-900 border-brand-500":"bg-neutral-800 border-neutral-700 text-neutral-300"}`;
       });
-    });
+      paint();
+    }));
   }
 }
 
-/* ===================== Cronómetro de jornada ===================== */
+/* ===================== Mapa ===================== */
+let map = null, userMarker = null, userCircle = null;
+let paradaMarkers = {};
+let lastPosition = null, watchId = null;
+
+function initMap() {
+  if (!document.getElementById("map")) return;
+  if (map) { map.remove(); map = null; paradaMarkers = {}; userMarker = null; userCircle = null; }
+  const center = lastPosition ? [lastPosition.lat, lastPosition.lng] : [40.4168, -3.7038];
+  map = L.map("map", { zoomControl:true }).setView(center, 13);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    subdomains: "abcd", maxZoom: 20,
+  }).addTo(map);
+
+  const paradaIcon = L.divIcon({
+    className:"",
+    html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
+    iconSize:[14,14], iconAnchor:[7,7],
+  });
+  getParadasCercanas().forEach(p => {
+    paradaMarkers[p.id] = L.marker([p.lat, p.lng], { icon: paradaIcon })
+      .addTo(map)
+      .bindPopup(`<div style="color:#111"><b>${esc(p.nombre)}</b><br><span style="font-size:11px">${esc(p.barrio)} · ${p.plazas} plazas</span></div>`);
+  });
+
+  if (lastPosition) drawUser(lastPosition.lat, lastPosition.lng);
+  setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+}
+
+function refreshNearbyMarkers() {
+  if (!map) return;
+  const cercanas = getParadasCercanas();
+  const ids = new Set(cercanas.map(p => p.id));
+
+  Object.keys(paradaMarkers).forEach(id => {
+    if (!ids.has(id)) {
+      try { map.removeLayer(paradaMarkers[id]); } catch(e){}
+      delete paradaMarkers[id];
+    }
+  });
+
+  const paradaIcon = L.divIcon({
+    className:"",
+    html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
+    iconSize:[14,14], iconAnchor:[7,7],
+  });
+  cercanas.forEach(p => {
+    if (!paradaMarkers[p.id]) {
+      paradaMarkers[p.id] = L.marker([p.lat, p.lng], { icon: paradaIcon })
+        .addTo(map)
+        .bindPopup(`<div style="color:#111"><b>${esc(p.nombre)}</b><br><span style="font-size:11px">${esc(p.barrio)} · ${p.plazas} plazas</span></div>`);
+    }
+  });
+}
+
+function drawUser(lat, lng) {
+  if (!map) return;
+  const userIcon = L.divIcon({
+    className:"",
+    html:`<div style="background:#3b82f6;border:3px solid white;width:18px;height:18px;border-radius:50%;box-shadow:0 0 0 8px rgba(59,130,246,0.25)"></div>`,
+    iconSize:[18,18], iconAnchor:[9,9],
+  });
+  if (!userMarker) userMarker = L.marker([lat,lng], { icon: userIcon }).addTo(map);
+  else userMarker.setLatLng([lat,lng]);
+  if (!userCircle) userCircle = L.circle([lat,lng], { radius: RADIO_PREGUNTAR, color:"#3b82f6", weight:1, fillColor:"#3b82f6", fillOpacity:0.08 }).addTo(map);
+  else userCircle.setLatLng([lat,lng]);
+}
+
+/* ===================== Geolocalización ===================== */
+function initGeolocation() {
+  if (!navigator.geolocation) {
+    const s = document.getElementById("geo-status"); if (s) s.textContent = "⚠️ Tu navegador no soporta geolocalización.";
+    return;
+  }
+  if (watchId !== null) return;
+  watchId = navigator.geolocation.watchPosition(onPosition, onGeoError, {
+    enableHighAccuracy: true, maximumAge: 5000, timeout: 20000,
+  });
+}
+function onGeoError(err) {
+  const s = document.getElementById("geo-status");
+  if (s) s.textContent = `⚠️ Error de ubicación: ${err.message}`;
+}
+function onPosition(pos) {
+  const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+  lastPosition = { lat, lng, accuracy };
+  drawUser(lat, lng);
+  const s = document.getElementById("geo-status");
+  if (s) s.textContent = `📍 Precisión ±${Math.round(accuracy)} m · actualizado ${formatTime(Date.now())}`;
+  checkAllParadas(lat, lng);
+  updateWaitingBanner();
+  if (state.view === "paradas" && map) refreshNearbyMarkers();
+  if (p2p.active) broadcastPosition();
+}
+
+/* ===================== Lógica de proximidad ===================== */
+function checkAllParadas(lat, lng) {
+  const now = Date.now();
+  PARADAS.forEach(p => {
+    const d = distanceMeters(lat, lng, p.lat, p.lng);
+    let st = proximityState[p.id];
+    if (!st) st = proximityState[p.id] = { status:"idle", insideSince:null, anchor:null, lastSeen:null };
+
+    if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
+      if (state.waitRecords && state.waitRecords[p.id]) state.waitRecords[p.id] = [];
+      st = proximityState[p.id] = { status:"idle", insideSince:null, anchor:null, lastSeen:now };
+    }
+    st.lastSeen = now;
+
+    if (st.status === "idle") {
+      if (d < RADIO_PREGUNTAR) {
+        if (!st.insideSince) {
+          st.insideSince = now;
+          st.anchor = { lat, lng };
+        } else {
+          const moved = distanceMeters(st.anchor.lat, st.anchor.lng, lat, lng);
+          if (moved > MOVIMIENTO_MAX_M) {
+            st.insideSince = now;
+            st.anchor = { lat, lng };
+          } else if (now - st.insideSince >= MIN_PARADO_SEGUNDOS * 1000) {
+            st.status = "asking";
+            askIfAtParada(p, d);
+          }
+        }
+      } else {
+        st.insideSince = null;
+        st.anchor = null;
+      }
+    } else if (st.status === "waiting" && d > RADIO_TERMINAR) {
+      finalizarEspera(p, st);
+    } else if (st.status === "dismissed" && d > RADIO_PREGUNTAR + 30) {
+      st.status = "idle";
+      st.insideSince = null;
+      st.anchor = null;
+    }
+  });
+}
+
+function askIfAtParada(parada, dist) {
+  if (document.getElementById("modal-parada")) return;
+  if (state.activeWait) { proximityState[parada.id] = { status:"dismissed", lastSeen: Date.now() }; return; }
+
+  const modal = document.createElement("div");
+  modal.id = "modal-parada";
+  modal.className = "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4";
+  modal.innerHTML = `
+    <div class="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div>
+        <div class="text-xs text-brand-500 font-semibold uppercase tracking-wide">📍 Cerca de una parada</div>
+        <h3 class="text-lg font-bold mt-1">¿Estás en ${esc(parada.nombre)}?</h3>
+        <p class="text-sm text-neutral-400 mt-1">Llevas 1 min parado a ${Math.round(dist)} m. Si confirmas, empiezo a contar tu espera.</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="modal-no" class="flex-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 font-medium">No</button>
+        <button id="modal-si" class="flex-1 rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Sí, estoy aquí</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById("modal-si").addEventListener("click", () => {
+    const st = proximityState[parada.id];
+    st.status = "waiting";
+    st.startTime = Date.now();
+    state.activeWait = { paradaId: parada.id, startTime: st.startTime };
+    save();
+    modal.remove();
+    if (state.view === "paradas") render();
+    updateWaitingBanner();
+    if (p2p.active) broadcastPosition();
+  });
+  document.getElementById("modal-no").addEventListener("click", () => {
+    proximityState[parada.id] = { status:"dismissed", lastSeen: Date.now() };
+    modal.remove();
+  });
+}
+
+function finalizarEspera(parada, st) {
+  const endTime = Date.now();
+  const duration = (endTime - st.startTime) / 1000;
+  st.status = "dismissed";
+  st.startTime = null;
+  state.activeWait = null;
+
+  if (duration < MIN_DURACION_ESPERA) { save(); updateWaitingBanner(); if (p2p.active) broadcastPosition(); return; }
+
+  if (!state.waitRecords) state.waitRecords = {};
+  if (!state.waitRecords[parada.id]) state.waitRecords[parada.id] = [];
+  state.waitRecords[parada.id].push({ start: st.startTime, end: endTime, duration });
+  if (state.waitRecords[parada.id].length > 500) {
+    state.waitRecords[parada.id] = state.waitRecords[parada.id].slice(-500);
+  }
+  save();
+  showToast(`✅ Espera registrada en ${parada.nombre}: ${formatDuration(duration)}`);
+  if (state.view === "paradas") render();
+  else updateWaitingBanner();
+  if (p2p.active) broadcastPosition();
+}
+
+/* ===================== Banner de espera activa ===================== */
+function updateWaitingBanner() {
+  const el = document.getElementById("waiting-banner");
+  if (!el) return;
+  if (!state.activeWait) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  const p = PARADAS.find(x => x.id === state.activeWait.paradaId);
+  if (!p) { el.classList.add("hidden"); return; }
+  const secs = (Date.now() - state.activeWait.startTime) / 1000;
+  el.className = "fixed top-0 left-0 right-0 max-w-md mx-auto z-[500] bg-brand-500 text-brand-900 px-4 py-2 flex items-center justify-between text-sm font-semibold shadow-lg";
+  el.innerHTML = `<span>⏱️ Esperando en ${esc(p.nombre)}</span><span class="font-mono">${formatDuration(secs)}</span>`;
+}
+
+function showToast(msg) {
+  const t = document.createElement("div");
+  t.className = "fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] bg-neutral-800 border border-neutral-700 text-sm px-4 py-2 rounded-full shadow-lg max-w-[90%] text-center";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+/* ===================== Estadísticas por parada ===================== */
+function renderParadaStats() {
+  const el = document.getElementById("parada-stats");
+  if (!el) return;
+  const records = state.waitRecords || {};
+  const ids = Object.keys(records).filter(id => (records[id]||[]).length > 0);
+  if (ids.length === 0) { el.innerHTML = ""; return; }
+
+  el.innerHTML = `
+    <h3 class="text-sm font-semibold text-neutral-400 mt-2">Tus estadísticas de espera</h3>
+    ${ids.map(id => {
+      const p = PARADAS.find(x => x.id === id); if (!p) return "";
+      const list = records[id];
+      const durs = list.map(r => r.duration);
+      const avg = durs.reduce((a,b)=>a+b,0) / durs.length;
+      const min = Math.min(...durs), max = Math.max(...durs);
+      const last = list[list.length-1];
+      const peers = peersEnParada(p.id);
+      return `
+        <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 space-y-1">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-medium flex items-center gap-2">
+                ${esc(p.nombre)}
+                ${peers>0?`<span class="text-[10px] rounded-full bg-green-600/20 text-green-400 px-2 py-0.5">${peers} aquí</span>`:""}
+              </div>
+              <div class="text-xs text-neutral-500">${list.length} ${list.length===1?"visita":"visitas"}</div>
+            </div>
+            <button data-reset="${id}" class="text-xs text-red-400">Borrar</button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 pt-2 text-center">
+            <div><div class="text-[10px] text-neutral-500">MEDIA</div><div class="text-sm font-semibold text-brand-500">${formatDuration(avg)}</div></div>
+            <div><div class="text-[10px] text-neutral-500">MÍN</div><div class="text-sm font-semibold">${formatDuration(min)}</div></div>
+            <div><div class="text-[10px] text-neutral-500">MÁX</div><div class="text-sm font-semibold">${formatDuration(max)}</div></div>
+          </div>
+          <div class="text-[11px] text-neutral-500 pt-1">Última: ${formatDateTime(last.end)}</div>
+        </div>`;
+    }).join("")}
+  `;
+  el.querySelectorAll("[data-reset]").forEach(b => b.addEventListener("click", () => {
+    if (!confirm("¿Borrar el historial de esperas de esta parada?")) return;
+    delete state.waitRecords[b.dataset.reset];
+    save(); renderParadaStats();
+  }));
+}
+
+/* ===================== Ticks periódicos ===================== */
 setInterval(() => {
   if (state.view === "jornada" && state.jornadaActivaId) {
-    const activa = state.jornadas.find((j) => j.id === state.jornadaActivaId);
+    const a = state.jornadas.find(j => j.id === state.jornadaActivaId);
     const el = document.getElementById("cronometro");
-    if (activa && el) el.textContent = formatDuration((Date.now() - activa.startedAt) / 1000);
+    if (a && el) el.textContent = formatDuration((Date.now()-a.startedAt)/1000);
+  }
+  if (state.activeWait) updateWaitingBanner();
+
+  const now = Date.now();
+  if (state.waitRecords) {
+    let changed = false;
+    Object.keys(proximityState).forEach(id => {
+      const st = proximityState[id];
+      if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
+        delete proximityState[id];
+        if (state.waitRecords[id] && state.waitRecords[id].length) { state.waitRecords[id] = []; changed = true; }
+      }
+    });
+    if (changed) { save(); if (state.view === "paradas") renderParadaStats(); }
   }
 }, 1000);
 
 /* ===================== Arranque ===================== */
 load();
 render();
+initGeolocation();
 </script>
 </body>
 </html>
