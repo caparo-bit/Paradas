@@ -1,0 +1,22 @@
+{
+  "name": "TaxiDiario",
+  "short_name": "TaxiDiario",
+  "description": "Controla tus jornadas, servicios, gastos y paradas de taxi",
+  "start_url": "/paradas/",
+  "scope": "/paradas/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0d",
+  "theme_color": "#f5b400",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230b0b0d'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E%F0%9F%9A%95%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "navigation"],
+  "prefer_related_applications": false
+}
