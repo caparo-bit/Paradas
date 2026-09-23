@@ -58,6 +58,10 @@
   .leaflet-popup-tip { background:#fff; }
   .leaflet-popup-content { margin: 10px 12px; font-size: 13px; }
 
+  [data-parada-card] { transition: border-color .15s, background-color .15s, transform .1s; }
+  [data-parada-card]:hover { border-color:#f5b400; }
+  [data-parada-card]:active { transform: scale(0.995); }
+
   #news-ticker {
     position: fixed; left: 0; right: 0;
     bottom: 62px;
@@ -228,7 +232,7 @@ const PARADAS_CATALOGO = [
   { id:"m31", nombre:"Aluche", municipio:"Madrid", barrio:"Latina", plazas:5, horario:"24h", lat:40.3860, lng:-3.7640 },
   { id:"m32", nombre:"Puerta del Ángel", municipio:"Madrid", barrio:"Latina", plazas:3, horario:"24h", lat:40.4140, lng:-3.7290 },
   { id:"m33", nombre:"Moncloa", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:6, horario:"24h", lat:40.4350, lng:-3.7200 },
-  { id:"m34", nombre:"Ciudad Universitaria", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:5, horario:"24h", lat:40.4430, lng:-3.7270 },
+  { id:"m34", nombre:"Ciudad Universitaria", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:5, horario:"24h", lat:40.4370, lng:-3.7270 },
   { id:"m35", nombre:"Peñagrande", municipio:"Madrid", barrio:"Fuencarral-El Pardo", plazas:3, horario:"24h", lat:40.4680, lng:-3.7230 },
   { id:"m36", nombre:"Mirasierra", municipio:"Madrid", barrio:"Fuencarral-El Pardo", plazas:4, horario:"24h", lat:40.4850, lng:-3.7130 },
   { id:"m37", nombre:"Las Tablas", municipio:"Madrid", barrio:"Fuencarral-El Pardo", plazas:4, horario:"24h", lat:40.5000, lng:-3.6700 },
@@ -274,6 +278,8 @@ const state = {
   hayPublico:[],
   sonidoActivo: true,
   ultimoAviso: {},
+  frecuencia: {},              // { [paradaId]: { total, ultimoTs } } — histórico persistente
+  paradaSeleccionadaId: null,  // parada resaltada en el mapa / lista
 };
 
 function load() {
@@ -283,6 +289,8 @@ function load() {
   }
   if (!state.hayPublico) state.hayPublico = [];
   if (!state.ultimoAviso) state.ultimoAviso = {};
+  if (!state.frecuencia) state.frecuencia = {};
+  if (!("paradaSeleccionadaId" in state)) state.paradaSeleccionadaId = null;
   if (typeof state.sonidoActivo !== "boolean") state.sonidoActivo = true;
 }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
@@ -318,6 +326,43 @@ function distanceMeters(lat1,lon1,lat2,lon2){
 const proximityState = {};
 const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
 const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
+
+/* ===================== Frecuencia de carga por parada ===================== */
+/**
+ * Devuelve un resumen de "frecuencia de carga" combinando:
+ *  - avisos "hay público" recibidos (state.frecuencia)
+ *  - visitas registradas (state.waitRecords)
+ */
+function getFrecuencia(paradaId) {
+  const f = state.frecuencia?.[paradaId] || { total: 0, ultimoTs: 0 };
+  const visitas = (state.waitRecords?.[paradaId]?.length) || 0;
+  const total = f.total + visitas;
+
+  let nivel, label, colorHex, bgClass;
+  if (total === 0) {
+    nivel="sin_datos"; label="Sin datos"; colorHex="#888";
+    bgClass="bg-neutral-700/30 text-neutral-400";
+  } else if (total >= 30) {
+    nivel="alta"; label="Alta"; colorHex="#ef4444";
+    bgClass="bg-red-500/20 text-red-400";
+  } else if (total >= 10) {
+    nivel="media"; label="Media"; colorHex="#f59e0b";
+    bgClass="bg-yellow-500/20 text-yellow-400";
+  } else {
+    nivel="baja"; label="Baja"; colorHex="#22c55e";
+    bgClass="bg-green-500/20 text-green-400";
+  }
+  return { nivel, label, colorHex, bgClass, total, avisos: f.total, visitas, ultimoTs: f.ultimoTs };
+}
+
+function registrarFrecuenciaAviso(paradaId, ts) {
+  if (!paradaId) return;
+  if (!state.frecuencia) state.frecuencia = {};
+  const f = state.frecuencia[paradaId] || { total: 0, ultimoTs: 0 };
+  f.total += 1;
+  f.ultimoTs = Math.max(f.ultimoTs || 0, ts || Date.now());
+  state.frecuencia[paradaId] = f;
+}
 
 /* ===================== Hash determinista para canales ===================== */
 function fnv1a(str) {
@@ -568,6 +613,8 @@ function addHayPublico(msg) {
   if (!state.hayPublico) state.hayPublico = [];
   if (state.hayPublico.find(a => a.id === msg.id)) return;
   state.hayPublico.push(msg);
+  // Cuenta persistente para "frecuencia de carga"
+  if (msg.paradaId) registrarFrecuenciaAviso(msg.paradaId, msg.ts);
   limpiarHayPublico();
   save();
   updateFireMarkers();
@@ -1016,6 +1063,7 @@ function renderParadas() {
         <div id="map"></div>
       </div>
       <div id="geo-status" class="text-xs text-neutral-500">Pidiendo ubicación…</div>
+      <div id="parada-seleccion-info"></div>
       <input id="paradas-q" placeholder="Buscar por nombre, barrio o municipio…" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
       <div class="flex items-center justify-between text-xs text-neutral-500">
         <span>${total} paradas (${propias} tuyas)</span>
@@ -1024,7 +1072,7 @@ function renderParadas() {
       <div class="space-y-2" id="paradas-lista"></div>
       <div id="parada-stats" class="space-y-2"></div>
       <p class="text-xs text-neutral-600">
-        Pregunta tras 1 min parado a menos de ${RADIO_PREGUNTAR} m · Cierra la espera al superar ${RADIO_TERMINAR} m · Reset a los 30 min sin visitar.
+        Toca una parada para centrarla en el mapa · Pregunta tras 1 min parado a menos de ${RADIO_PREGUNTAR} m · Cierra la espera al superar ${RADIO_TERMINAR} m · Reset a los 30 min sin visitar.
       </p>
     </div>`;
 }
@@ -1040,6 +1088,76 @@ function renderDashboard() {
       </div>
       <div class="grid grid-cols-2 gap-3" id="panel-stats"></div>
     </div>`;
+}
+
+/* ===================== Selección de parada ===================== */
+function seleccionarParada(id) {
+  const p = getAllParadas().find(x => x.id === id);
+  if (!p) return;
+  state.paradaSeleccionadaId = id;
+  save();
+
+  if (map) {
+    const targetZoom = Math.max(map.getZoom(), 16);
+    try { map.flyTo([p.lat, p.lng], targetZoom, { duration: 0.6 }); }
+    catch(e) { map.setView([p.lat, p.lng], targetZoom); }
+    updateParadaMarkerIcons();
+    setTimeout(() => {
+      const m = paradaMarkers[p.id];
+      if (m) {
+        m.openPopup();
+        setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 60);
+      }
+    }, 650);
+  }
+
+  // Repinta la lista para mostrar la selección
+  const input = document.getElementById("paradas-q");
+  if (input) input.dispatchEvent(new Event("input"));
+
+  setTimeout(() => {
+    const el = document.querySelector(`[data-parada-card="${id}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    renderParadaSeleccionInfo();
+  }, 100);
+}
+
+function renderParadaSeleccionInfo() {
+  const el = document.getElementById("parada-seleccion-info");
+  if (!el) return;
+  const id = state.paradaSeleccionadaId;
+  if (!id) { el.innerHTML = ""; return; }
+  const p = getAllParadas().find(x => x.id === id);
+  if (!p) { el.innerHTML = ""; return; }
+  const f = getFrecuencia(p.id);
+  const dist = lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null;
+  el.innerHTML = `
+    <div class="rounded-xl bg-gradient-to-br from-brand-500/15 to-brand-600/5 border border-brand-500/40 p-3 space-y-2">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1">
+          <div class="text-[10px] uppercase tracking-wide text-brand-500 font-semibold">📍 Parada seleccionada</div>
+          <div class="font-bold text-sm mt-0.5">${esc(p.nombre)}</div>
+          <div class="text-xs text-neutral-400">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist<1000?Math.round(dist)+" m":(dist/1000).toFixed(1)+" km"}`:""}</div>
+        </div>
+        <button id="btn-deseleccionar" class="text-xs text-neutral-400 hover:text-neutral-200 shrink-0">✕</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[11px] rounded-full px-2 py-0.5 font-semibold ${f.bgClass}">📊 Frecuencia ${f.label}${f.total?` · ${f.total}`:""}</span>
+        <span class="text-[11px] text-neutral-400">🔥 ${f.avisos} avisos</span>
+        <span class="text-[11px] text-neutral-400">👥 ${f.visitas} visitas</span>
+        <span class="text-[11px] text-neutral-400">🅿️ ${p.plazas} plazas</span>
+      </div>
+    </div>`;
+  const btn = document.getElementById("btn-deseleccionar");
+  if (btn) btn.addEventListener("click", () => {
+    state.paradaSeleccionadaId = null;
+    save();
+    updateParadaMarkerIcons();
+    if (map) map.closePopup();
+    const input = document.getElementById("paradas-q");
+    if (input) input.dispatchEvent(new Event("input"));
+    renderParadaSeleccionInfo();
+  });
 }
 
 /* ===================== Eventos ===================== */
@@ -1137,6 +1255,7 @@ function bindViewEvents() {
     const input = document.getElementById("paradas-q");
     const lista = document.getElementById("paradas-lista");
     const countEl = document.getElementById("paradas-count");
+
     const paint = (q="") => {
       const todas = getAllParadas();
       const conDist = todas.map(p => ({
@@ -1156,40 +1275,66 @@ function bindViewEvents() {
           const st = proximityState[p.id];
           const activo = st && st.status === "waiting";
           const propia = state.paradasUsuario.some(x => x.id === p.id);
+          const seleccionada = state.paradaSeleccionadaId === p.id;
+          const frec = getFrecuencia(p.id);
           const fuegosAqui = state.hayPublico.filter(a => a.paradaId === p.id).length;
+
+          const borderClass = seleccionada
+            ? "border-brand-500 ring-2 ring-brand-500/30"
+            : (activo ? "border-brand-500" : "border-neutral-800");
+
           return `
-            <div class="rounded-lg bg-neutral-900 border ${activo?"border-brand-500":"border-neutral-800"} p-3">
+            <div data-parada-card="${p.id}" class="rounded-lg bg-neutral-900 border ${borderClass} p-3 cursor-pointer">
               <div class="flex justify-between items-start gap-2">
-                <div class="flex-1">
+                <div class="flex-1 min-w-0">
                   <div class="font-medium flex items-center gap-2 flex-wrap">
                     ${activo?"⏱️ ":""}${esc(p.nombre)}
                     ${propia?`<span class="text-[10px] rounded-full bg-brand-500/20 text-brand-500 px-2 py-0.5">tuya</span>`:""}
                     ${fuegosAqui>0?`<span class="text-[10px] rounded-full bg-red-500/20 text-red-400 px-2 py-0.5">🔥 ${fuegosAqui}</span>`:""}
                   </div>
-                  <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist < 1000 ? Math.round(dist)+" m" : (dist/1000).toFixed(1)+" km"}`:""}</div>
+                  <div class="text-xs text-neutral-500 mt-0.5 truncate">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist < 1000 ? Math.round(dist)+" m" : (dist/1000).toFixed(1)+" km"}`:""}</div>
+                  <div class="flex items-center gap-1.5 flex-wrap mt-2">
+                    <span class="text-[10px] rounded-full px-2 py-0.5 font-semibold ${frec.bgClass}">📊 ${frec.label}${frec.total?` · ${frec.total}`:""}</span>
+                    <span class="text-[10px] text-neutral-500">🔥 ${frec.avisos}</span>
+                    <span class="text-[10px] text-neutral-500">👥 ${frec.visitas}</span>
+                  </div>
                   <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
                 </div>
-                <div class="flex flex-col gap-1 items-end">
-                  <button data-ir-parada="${p.id}" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">Ir</button>
+                <div class="flex flex-col gap-1 items-end shrink-0">
+                  <button data-ir-parada="${p.id}" class="text-xs rounded-full px-3 py-1 ${seleccionada?"bg-brand-500 text-brand-900 font-semibold":"bg-neutral-800 border border-neutral-700 text-brand-500"}">${seleccionada?"✓ Aquí":"Ir"}</button>
                   ${propia?`<button data-del-parada="${p.id}" class="text-xs text-red-400">Borrar</button>`:""}
                 </div>
               </div>
             </div>`;
         }).join("");
 
-      lista.querySelectorAll("[data-ir-parada]").forEach(b => b.addEventListener("click", () => {
-        const p = getAllParadas().find(x => x.id === b.dataset.irParada);
-        if (p && map) { map.setView([p.lat, p.lng], 17); setTimeout(()=>map.invalidateSize(), 50); }
+      // Toda la tarjeta selecciona (salvo botones)
+      lista.querySelectorAll("[data-parada-card]").forEach(card => {
+        card.addEventListener("click", (e) => {
+          if (e.target.closest("button")) return;
+          seleccionarParada(card.dataset.paradaCard);
+        });
+      });
+      // Botón "Ir" / "✓ Aquí"
+      lista.querySelectorAll("[data-ir-parada]").forEach(b => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        seleccionarParada(b.dataset.irParada);
       }));
-      lista.querySelectorAll("[data-del-parada]").forEach(b => b.addEventListener("click", () => {
+      // Borrar (solo paradas propias)
+      lista.querySelectorAll("[data-del-parada]").forEach(b => b.addEventListener("click", (e) => {
+        e.stopPropagation();
         if (!confirm("¿Borrar esta parada que añadiste?")) return;
-        state.paradasUsuario = state.paradasUsuario.filter(x => x.id !== b.dataset.delParada);
+        const id = b.dataset.delParada;
+        state.paradasUsuario = state.paradasUsuario.filter(x => x.id !== id);
+        if (state.paradaSeleccionadaId === id) state.paradaSeleccionadaId = null;
         save(); recalcularClusters(); render();
       }));
     };
+
     paint();
     input.addEventListener("input", () => paint(input.value));
     renderParadaStats();
+    renderParadaSeleccionInfo();
   }
 
   if (state.view === "dashboard") {
@@ -1298,6 +1443,50 @@ function mostrarFormularioParada() {
   });
 }
 
+/* ===================== Iconos de parada ===================== */
+function getParadaIcon(selected) {
+  if (selected) {
+    return L.divIcon({
+      className:"",
+      html:`<div style="background:#f5b400;border:3px solid #fff;width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 8px rgba(245,180,0,0.35), 0 2px 6px rgba(0,0,0,0.5)"></div>`,
+      iconSize:[22,22], iconAnchor:[11,11],
+    });
+  }
+  return L.divIcon({
+    className:"",
+    html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
+    iconSize:[14,14], iconAnchor:[7,7],
+  });
+}
+
+function paradaPopupHtml(p) {
+  const f = getFrecuencia(p.id);
+  const frecTxt = f.total > 0
+    ? `<span style="color:${f.colorHex};font-weight:700">${f.label}</span> <span style="color:#888">(${f.total})</span>`
+    : `<span style="color:#999">Sin datos</span>`;
+  const dist = lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null;
+  const distTxt = dist != null ? ` · ${dist<1000?Math.round(dist)+" m":(dist/1000).toFixed(1)+" km"}` : "";
+  return `<div style="color:#111;font-family:inherit;min-width:180px">
+    <b>${esc(p.nombre)}</b><br>
+    <span style="font-size:11px;color:#666">${esc(p.barrio)} · ${p.plazas} plazas${distTxt}</span>
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee;font-size:11px;line-height:1.5">
+      <div><b>📊 Frecuencia:</b> ${frecTxt}</div>
+      <div><b>🔥 Avisos:</b> ${f.avisos} &nbsp; <b>👥 Visitas:</b> ${f.visitas}</div>
+    </div>
+  </div>`;
+}
+
+function updateParadaMarkerIcons() {
+  if (!map) return;
+  Object.entries(paradaMarkers).forEach(([id, m]) => {
+    const sel = id === state.paradaSeleccionadaId;
+    try {
+      m.setIcon(getParadaIcon(sel));
+      m.setZIndexOffset(sel ? 400 : 0);
+    } catch(e){}
+  });
+}
+
 /* ===================== Mapa ===================== */
 function initMap() {
   const el = document.getElementById("map");
@@ -1306,9 +1495,15 @@ function initMap() {
   paradaMarkers = {}; userMarker = null; userCircle = null;
   fireMarkers = [];
 
-  const center = lastPosition ? [lastPosition.lat, lastPosition.lng] : [40.4168, -3.7038];
+  // Centro inicial: si hay parada seleccionada, centrar en ella; si no, en el usuario; si no, Madrid
+  let center, zoom;
+  const selP = state.paradaSeleccionadaId ? getAllParadas().find(x => x.id === state.paradaSeleccionadaId) : null;
+  if (selP) { center = [selP.lat, selP.lng]; zoom = 16; }
+  else if (lastPosition) { center = [lastPosition.lat, lastPosition.lng]; zoom = 14; }
+  else { center = [40.4168, -3.7038]; zoom = 11; }
+
   try {
-    map = L.map("map", { zoomControl:true }).setView(center, lastPosition ? 14 : 11);
+    map = L.map("map", { zoomControl:true }).setView(center, zoom);
   } catch(e) { console.error("Error creando mapa:", e); return; }
 
   // Teselas estilo Google Maps (roadmap estándar)
@@ -1325,20 +1520,41 @@ function initMap() {
     ? todas.filter(p => distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) < NEARBY_RADIUS_M)
     : todas;
 
-  const paradaIcon = L.divIcon({
-    className:"",
-    html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
-    iconSize:[14,14], iconAnchor:[7,7],
-  });
   cercanas.forEach(p => {
-    paradaMarkers[p.id] = L.marker([p.lat, p.lng], { icon: paradaIcon })
+    const seleccionada = p.id === state.paradaSeleccionadaId;
+    const marker = L.marker([p.lat, p.lng], {
+      icon: getParadaIcon(seleccionada),
+      zIndexOffset: seleccionada ? 400 : 0,
+    })
       .addTo(map)
-      .bindPopup(`<div style="color:#111"><b>${esc(p.nombre)}</b><br><span style="font-size:11px">${esc(p.barrio)} · ${p.plazas} plazas</span></div>`);
+      .bindPopup(paradaPopupHtml(p));
+
+    marker.on("click", () => {
+      state.paradaSeleccionadaId = p.id;
+      save();
+      updateParadaMarkerIcons();
+      const input = document.getElementById("paradas-q");
+      if (input) input.dispatchEvent(new Event("input"));
+      setTimeout(() => {
+        const el2 = document.querySelector(`[data-parada-card="${p.id}"]`);
+        if (el2) el2.scrollIntoView({ behavior:"smooth", block:"center" });
+        renderParadaSeleccionInfo();
+      }, 50);
+    });
+
+    paradaMarkers[p.id] = marker;
   });
 
   if (lastPosition) drawUser(lastPosition.lat, lastPosition.lng);
   updateFireMarkers();
   initGeolocation();
+
+  // Si hay una parada seleccionada, abrir su popup al entrar
+  if (selP && paradaMarkers[selP.id]) {
+    setTimeout(() => {
+      try { paradaMarkers[selP.id].openPopup(); } catch(e){}
+    }, 400);
+  }
 }
 
 function refreshNearbyMarkers() {
@@ -1354,16 +1570,33 @@ function refreshNearbyMarkers() {
       delete paradaMarkers[id];
     }
   });
-  const paradaIcon = L.divIcon({
-    className:"",
-    html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
-    iconSize:[14,14], iconAnchor:[7,7],
-  });
   cercanas.forEach(p => {
     if (!paradaMarkers[p.id]) {
-      paradaMarkers[p.id] = L.marker([p.lat, p.lng], { icon: paradaIcon })
+      const seleccionada = p.id === state.paradaSeleccionadaId;
+      const marker = L.marker([p.lat, p.lng], {
+        icon: getParadaIcon(seleccionada),
+        zIndexOffset: seleccionada ? 400 : 0,
+      })
         .addTo(map)
-        .bindPopup(`<div style="color:#111"><b>${esc(p.nombre)}</b><br><span style="font-size:11px">${esc(p.barrio)} · ${p.plazas} plazas</span></div>`);
+        .bindPopup(paradaPopupHtml(p));
+
+      marker.on("click", () => {
+        state.paradaSeleccionadaId = p.id;
+        save();
+        updateParadaMarkerIcons();
+        const input = document.getElementById("paradas-q");
+        if (input) input.dispatchEvent(new Event("input"));
+        setTimeout(() => {
+          const el = document.querySelector(`[data-parada-card="${p.id}"]`);
+          if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+          renderParadaSeleccionInfo();
+        }, 50);
+      });
+
+      paradaMarkers[p.id] = marker;
+    } else {
+      // Actualizar popup por si cambió la frecuencia
+      paradaMarkers[p.id].setPopupContent(paradaPopupHtml(p));
     }
   });
 }
@@ -1423,10 +1656,11 @@ function onPosition(pos) {
   }
 
   if (state.view === "paradas") {
-    if (first && map) map.setView([lat, lng], 15);
+    if (first && map && !state.paradaSeleccionadaId) map.setView([lat, lng], 15);
     refreshNearbyMarkers();
     const input = document.getElementById("paradas-q");
     if (input) input.dispatchEvent(new Event("input"));
+    renderParadaSeleccionInfo();
   }
 }
 
@@ -1547,12 +1781,13 @@ function renderParadaStats() {
       const avg = durs.reduce((a,b)=>a+b,0) / durs.length;
       const min = Math.min(...durs), max = Math.max(...durs);
       const last = list[list.length-1];
+      const frec = getFrecuencia(id);
       return `
         <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 space-y-1">
           <div class="flex justify-between items-start">
             <div>
               <div class="font-medium">${esc(p.nombre)}</div>
-              <div class="text-xs text-neutral-500">${list.length} ${list.length===1?"visita":"visitas"}</div>
+              <div class="text-xs text-neutral-500">${list.length} ${list.length===1?"visita":"visitas"} · <span class="${frec.bgClass} px-1.5 py-0.5 rounded-full text-[10px]">📊 ${frec.label}</span></div>
             </div>
             <button data-reset="${id}" class="text-xs text-red-400">Borrar</button>
           </div>
