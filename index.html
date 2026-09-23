@@ -7,6 +7,16 @@
 <meta name="description" content="Controla tus jornadas, servicios, gastos y paradas de taxi" />
 <meta name="author" content="TaxiDiario © 2026 - Todos los derechos reservados" />
 <meta name="robots" content="noindex, nofollow" />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#f5b400" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="TaxiDiario" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230b0b0d'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E%F0%9F%9A%95%3C/text%3E%3C/svg%3E" />
+
 <!--
   ============================================================
   © 2026 TaxiDiario. Todos los derechos reservados.
@@ -24,6 +34,11 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- Web Push + Wake Lock -->
+<script src="push-client.js" defer></script>
+<script src="wake-lock.js" defer></script>
+
 <style>
   html, body, #root { height: 100%; }
   body { background:#0b0b0d; color:#f5f5f5; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin:0; }
@@ -143,13 +158,11 @@ const HAY_PUBLICO_VENTANA_MS   = 5*60*1000;
 const HAY_PUBLICO_UMBRAL       = 5;
 const NTFY_BASE = "https://ntfy.sh";
 
-/* ---------- Paradas comunitarias ---------- */
 const PARADA_VIDA_MS      = 24 * 60 * 60 * 1000;
 const PARADA_MIN_VERIF    = 5;
 const PARADA_MIN_EXTENDER = 2;
 const PARADA_RADIO_VERIF_M = 300;
 
-/* ---------- Clusters ---------- */
 const CENTRO_RADIO_M = 4000;
 const SOL_LAT = 40.4168, SOL_LNG = -3.7038;
 const UMBRAL_CENTRO = 1000;
@@ -158,24 +171,20 @@ const UMBRAL_MIXTO  = 2500;
 const CLUSTERS_VECINOS = 2;
 const FILTRO_RADIO_AVISO_M = 3000;
 
-/* ---------- Canales ---------- */
 const SEED_CANAL = "txd-2026-caparo-bit-paradas-cambia-esta-semilla-por-algo-unico-tuyo-a8f3e1b9c2d4";
 const PREFIJO_CANAL = "txd-cl-";
 const CANAL_GLOBAL = "txd-global-paradas-2026";
 
-/* ---------- Anti-spam ---------- */
 const MISMA_PARADA_MS  = 60*1000;
 const MISMA_PARADA_DEDUP_MS = 5*60*1000;
 
-/* ---------- Optimización de red ---------- */
 const RATE_LIMIT_VENTANA_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
 const BATCH_VERIF_MS = 5000;
 const MAX_INTENTOS_COLA = 5;
 
-/* ---------- FAB arrastrable ---------- */
-const FAB_DRAG_THRESHOLD_PX = 8;  // si el dedo se mueve menos, cuenta como click
-const FAB_MARGIN_PX = 6;          // separación mínima con los bordes
+const FAB_DRAG_THRESHOLD_PX = 8;
+const FAB_MARGIN_PX = 6;
 
 /* ===================== Catálogo de paradas ===================== */
 const PARADAS_CATALOGO = [
@@ -264,7 +273,7 @@ const state = {
   taxistaId: "",
   historialPublicaciones: [],
   colaPublicacion: [],
-  fabPos: null,                 // { left, top } | null
+  fabPos: null,
 };
 
 function load() {
@@ -275,7 +284,6 @@ function load() {
       if (old) { try { localStorage.setItem(STORAGE_KEY, old); } catch(e){} }
     }
   } catch(e){}
-
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) Object.assign(state, JSON.parse(raw)); } catch(e){}
   if (state.activeWait) {
     proximityState[state.activeWait.paradaId] = { status:"waiting", startTime: state.activeWait.startTime, lastSeen: Date.now() };
@@ -350,7 +358,7 @@ const proximityState = {};
 const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
 const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
 
-/* ===================== Frecuencia de carga ===================== */
+/* ===================== Frecuencia ===================== */
 function getFrecuencia(paradaId) {
   const f = state.frecuencia?.[paradaId] || { total: 0, ultimoTs: 0 };
   const visitas = (state.waitRecords?.[paradaId]?.length) || 0;
@@ -371,7 +379,7 @@ function registrarFrecuenciaAviso(paradaId, ts) {
   state.frecuencia[paradaId] = f;
 }
 
-/* ===================== Hash determinista ===================== */
+/* ===================== Hash ===================== */
 function fnv1a(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -406,7 +414,7 @@ function registrarPublicacion(tipo) {
   save();
 }
 
-/* ===================== Cola de publicación con reintentos ===================== */
+/* ===================== Cola ===================== */
 let procesandoCola = false;
 async function publicarEnNtfy(canal, headers, body, tipo) {
   if (!puedePublicar(tipo)) return false;
@@ -522,7 +530,7 @@ function getClustersCercanos(n) {
     .sort((a,b) => a.d - b.d).slice(0, n).map(x => x.c);
 }
 
-/* ===================== Suscripciones SSE ===================== */
+/* ===================== SSE ===================== */
 const suscripciones = {};
 
 function gestionarSuscripciones() {
@@ -622,13 +630,12 @@ function recibirNuevaParada(payload) {
     confirmada: false,
   };
   state.paradasUsuario.push(nueva);
-  save();
-  recalcularClusters();
+  save(); recalcularClusters();
   showToast(`📍 Nueva parada recibida: ${p.nombre}`);
   if (state.view === "paradas") render();
 }
 
-/* ===================== Batching de verificaciones ===================== */
+/* ===================== Batching verificaciones ===================== */
 let bufferVerificaciones = [];
 let timerVerif = null;
 
@@ -646,12 +653,7 @@ async function flushVerificaciones() {
   bufferVerificaciones = [];
   const cluster = getClusterActual();
   const canal = cluster ? cluster.canal : CANAL_GLOBAL;
-  const payload = {
-    type: "paradaVerifyBatch",
-    paradaIds: ids,
-    taxistaId: getTaxistaId(),
-    ts: Date.now(),
-  };
+  const payload = { type: "paradaVerifyBatch", paradaIds: ids, taxistaId: getTaxistaId(), ts: Date.now() };
   const headers = { "Content-Type":"application/json", "Title":"Verificaciones", "Priority":"low" };
   await publicarEnNtfy(canal, headers, JSON.stringify(payload), "verificacion");
 }
@@ -671,7 +673,7 @@ function aplicarVerificacion(paradaId, taxistaId, ts) {
   if (state.view === "paradas") render();
 }
 
-/* ===================== Ciclo de vida de paradas ===================== */
+/* ===================== Ciclo de vida paradas ===================== */
 function mantenimientoParadas() {
   const ahora = Date.now();
   let cambiado = false;
@@ -693,13 +695,12 @@ function mantenimientoParadas() {
     return false;
   });
   if (cambiado) {
-    save();
-    recalcularClusters();
+    save(); recalcularClusters();
     if (state.view === "paradas") render();
   }
 }
 
-/* ===================== Avisos "Hay público" ===================== */
+/* ===================== Hay público ===================== */
 let fireMarkers = [];
 
 async function notificarHayPublico() {
@@ -736,7 +737,6 @@ async function notificarHayPublico() {
   if (ok) showToast(`🔥 Enviado a ${cluster.nombre}`);
 }
 
-/* ---------- Confirmación previa al aviso ---------- */
 function pedirConfirmacionHayPublico() {
   if (document.getElementById("modal-confirm-hp")) return;
   if (!lastPosition) { showToast("⚠️ Necesito tu ubicación GPS"); return; }
@@ -748,13 +748,9 @@ function pedirConfirmacionHayPublico() {
   const cluster = getClusterActual();
 
   let sitio;
-  if (parada) {
-    sitio = `en <b>${esc(parada.nombre)}</b>`;
-  } else if (cluster?.nombre) {
-    sitio = `en la zona <b>${esc(cluster.nombre.toUpperCase())}</b>`;
-  } else {
-    sitio = "en tu ubicación actual";
-  }
+  if (parada) sitio = `en <b>${esc(parada.nombre)}</b>`;
+  else if (cluster?.nombre) sitio = `en la zona <b>${esc(cluster.nombre.toUpperCase())}</b>`;
+  else sitio = "en tu ubicación actual";
 
   const coords = `${lastPosition.lat.toFixed(5)}, ${lastPosition.lng.toFixed(5)}`;
 
@@ -903,7 +899,7 @@ async function pedirPermisoNotificaciones() {
   }
 }
 
-/* ===================== Background / Foreground ===================== */
+/* ===================== Background/Foreground ===================== */
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     cerrarTodasSuscripciones();
@@ -976,10 +972,10 @@ function render() {
   if (state.view === "jornada") requestAnimationFrame(() => { initJornadaCharts(); });
 }
 
-/* ===================== FAB: arrastrable + tap con confirmación ===================== */
+/* ===================== FAB arrastrable ===================== */
 function clampFabToViewport(left, top, w, h) {
   const maxLeft = Math.max(FAB_MARGIN_PX, window.innerWidth - w - FAB_MARGIN_PX);
-  const maxTop  = Math.max(FAB_MARGIN_PX, window.innerHeight - h - 62 - FAB_MARGIN_PX); // 62 = altura nav
+  const maxTop  = Math.max(FAB_MARGIN_PX, window.innerHeight - h - 62 - FAB_MARGIN_PX);
   return {
     left: Math.max(FAB_MARGIN_PX, Math.min(maxLeft, left)),
     top:  Math.max(FAB_MARGIN_PX, Math.min(maxTop,  top)),
@@ -990,7 +986,6 @@ function initFab() {
   const fab = document.getElementById("fab-hay-publico");
   if (!fab) return;
 
-  // Aplicar posición guardada
   if (state.fabPos) {
     const rect = fab.getBoundingClientRect();
     const c = clampFabToViewport(state.fabPos.left, state.fabPos.top, rect.width || 120, rect.height || 32);
@@ -1041,13 +1036,11 @@ function initFab() {
     pointerId = null;
     fab.classList.remove("dragging");
     try { fab.releasePointerCapture(e.pointerId); } catch(err){}
-
     if (wasMoved) {
       const r = fab.getBoundingClientRect();
       state.fabPos = { left: r.left, top: r.top };
       save();
     } else {
-      // TAP: pedir confirmación
       try { navigator.vibrate && navigator.vibrate(20); } catch(err){}
       pedirConfirmacionHayPublico();
     }
@@ -1063,11 +1056,9 @@ function initFab() {
   fab.addEventListener("pointermove", onMove);
   fab.addEventListener("pointerup", onUp);
   fab.addEventListener("pointercancel", onCancel);
-  // Evita menú contextual (long press en móvil)
   fab.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 
-// Reajustar al girar / cambiar tamaño
 window.addEventListener("resize", () => {
   if (!state.fabPos) return;
   const fab = document.getElementById("fab-hay-publico");
@@ -1133,6 +1124,14 @@ function renderHome() {
             ${state.sonidoActivo ? "🔔 Avisos activos" : "🔕 Avisos silenciados"}
           </button>
           <button id="btn-pedir-notif" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300">Permitir notif.</button>
+        </div>
+        <div class="flex gap-2 pt-1">
+          <button id="btn-push" class="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 hover:border-brand-500 py-1.5 text-xs font-semibold text-neutral-300">
+            📡 Activar avisos en segundo plano
+          </button>
+          <button id="btn-wakelock" class="rounded-lg bg-neutral-800 border border-neutral-700 hover:border-brand-500 px-3 py-1.5 text-xs text-neutral-300" title="Mantener pantalla encendida">
+            🌑
+          </button>
         </div>
       </div>
 
@@ -1421,7 +1420,7 @@ function renderDashboard() {
     </div>`;
 }
 
-/* ===================== Selección de parada ===================== */
+/* ===================== Selección parada ===================== */
 function seleccionarParada(id) {
   const p = getAllParadas().find(x => x.id === id);
   if (!p) return;
@@ -1515,6 +1514,74 @@ function bindViewEvents() {
       await pedirPermisoNotificaciones();
       showToast(Notification.permission === "granted" ? "🔔 Notificaciones activadas" : "Notificaciones no permitidas");
     });
+
+    // ---------- Web Push ----------
+    const btnPush = document.getElementById("btn-push");
+    if (btnPush) {
+      // Estado inicial
+      const perm = window.TaxiPush ? window.TaxiPush.permisos() : "unsupported";
+      if (perm === "granted") {
+        btnPush.textContent = "✅ Avisos en 2º plano activos";
+        btnPush.classList.add("border-green-500", "text-green-400");
+      } else if (perm === "denied") {
+        btnPush.textContent = "🚫 Notificaciones bloqueadas";
+        btnPush.classList.add("border-red-500", "text-red-400");
+      } else if (!window.TaxiPush || !window.TaxiPush.estaSoportado()) {
+        btnPush.textContent = "❌ No soportado en este navegador";
+        btnPush.classList.add("text-neutral-500");
+      }
+
+      btnPush.addEventListener("click", async () => {
+        if (!window.TaxiPush || !window.TaxiPush.estaSoportado()) {
+          showToast("❌ Tu navegador no soporta notificaciones push");
+          return;
+        }
+        const cluster = getClusterActual();
+        const topic = cluster ? cluster.canal : CANAL_GLOBAL;
+
+        btnPush.disabled = true;
+        const previo = btnPush.textContent;
+        btnPush.textContent = "⏳ Suscribiendo…";
+
+        const res = await window.TaxiPush.suscribir(topic);
+        if (res.ok) {
+          btnPush.textContent = "✅ Avisos en 2º plano activados";
+          btnPush.classList.remove("border-neutral-700");
+          btnPush.classList.add("border-green-500", "text-green-400");
+          showToast("📡 Recibirás avisos aunque cierres la app");
+        } else {
+          btnPush.textContent = "❌ Error: " + (res.motivo || "desconocido");
+          btnPush.disabled = false;
+          setTimeout(() => { btnPush.textContent = previo; }, 3000);
+        }
+      });
+    }
+
+    // ---------- Wake Lock ----------
+    const btnWake = document.getElementById("btn-wakelock");
+    if (btnWake) {
+      const pintarWake = () => {
+        const activo = window.TaxiWakeLock && window.TaxiWakeLock.estaActivo();
+        btnWake.textContent = activo ? "🔆" : "🌑";
+        btnWake.title = activo ? "Pantalla siempre encendida (toca para desactivar)" : "Mantener pantalla encendida";
+        btnWake.className = `rounded-lg border px-3 py-1.5 text-xs ${activo ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
+      };
+      pintarWake();
+      btnWake.addEventListener("click", async () => {
+        if (!window.TaxiWakeLock || !window.TaxiWakeLock.estaSoportado()) {
+          showToast("❌ Tu navegador no soporta Wake Lock");
+          return;
+        }
+        if (window.TaxiWakeLock.estaActivo()) {
+          await window.TaxiWakeLock.desactivar();
+        } else {
+          const ok = await window.TaxiWakeLock.activar();
+          if (!ok) showToast("⚠️ No se pudo activar (¿batería baja?)");
+        }
+        pintarWake();
+      });
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) pintarWake(); });
+    }
   }
 
   if (state.view === "jornada") {
@@ -1880,7 +1947,6 @@ function mostrarFormularioParada(paradaId) {
 
     const valores = { nombre, municipio, barrio, plazas, horario, lat, lng };
 
-    // ---- MODO EDICIÓN ----
     if (editando) {
       if (esCatalogo) {
         const orig = PARADAS_CATALOGO.find(x => x.id === editando.id);
@@ -1902,7 +1968,6 @@ function mostrarFormularioParada(paradaId) {
       return;
     }
 
-    // ---- MODO CREACIÓN ----
     const ahora = Date.now();
     const nueva = {
       id: uid("usr"), nombre, municipio, barrio, plazas, horario, lat, lng,
@@ -1920,7 +1985,7 @@ function mostrarFormularioParada(paradaId) {
   });
 }
 
-/* ===================== Iconos de parada ===================== */
+/* ===================== Iconos parada ===================== */
 function getParadaIcon(selected) {
   if (selected) {
     return L.divIcon({
@@ -2320,7 +2385,6 @@ setInterval(() => {
     if (huboCambios) save();
     if (state.view === "paradas" && map) updateFireMarkers();
     updateTicker();
-    // Purga de ultimoAviso (evita crecimiento sin límite)
     const limite = now - MISMA_PARADA_DEDUP_MS;
     let purgado = false;
     Object.keys(state.ultimoAviso || {}).forEach(k => {
@@ -2330,7 +2394,6 @@ setInterval(() => {
   }
 }, 1000);
 
-/* Cada 5 min: mantenimiento de paradas y reintento de cola */
 setInterval(() => {
   mantenimientoParadas();
   procesarCola();
