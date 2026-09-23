@@ -13,18 +13,14 @@
 </script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script type="module">
-  window.__trysteroPromise = import('https://esm.sh/trystero@0.21.6/nostr')
-    .then(m => m)
-    .catch(e => { console.warn('Trystero no disponible:', e); return null; });
-</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   html, body, #root { height: 100%; }
   body { background:#0b0b0d; color:#f5f5f5; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin:0; }
   ::-webkit-scrollbar { width:6px; height:6px; }
   ::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
-  input, button { font-family: inherit; }
-  #map { height: 50vh; min-height: 300px; width: 100%; background:#1a1a1d; }
+  input, button, select { font-family: inherit; }
+  #map { height: 55vh; min-height: 320px; width: 100%; background:#1a1a1d; z-index:0; }
   .leaflet-container { background:#1a1a1d; }
   .leaflet-control-attribution { background: rgba(0,0,0,0.5) !important; color:#999 !important; font-size:10px !important; }
   .leaflet-control-attribution a { color:#bbb !important; }
@@ -37,45 +33,94 @@
 
 <script>
 /* ===================== Configuración ===================== */
-const RADIO_PREGUNTAR      = 150;   // m
-const RADIO_TERMINAR       = 250;   // m (= 150 + 100)
-const MIN_PARADO_SEGUNDOS  = 60;    // debe estar quieto 1 min
-const MOVIMIENTO_MAX_M     = 30;    // se considera "quieto" si no se mueve >30 m
-const MIN_DURACION_ESPERA  = 20;    // s mínimos para guardar una espera
-const RESET_SIN_VISITA_MS  = 30*60*1000; // 30 min → reset registros de esa parada
-const P2P_ENVIO_CADA_MS    = 10000;
-const P2P_PEER_ACTIVO_MS   = 60000;
-const NEARBY_RADIUS_M      = 5000;  // solo mostrar paradas a menos de 5 km
+const RADIO_PREGUNTAR      = 150;
+const RADIO_TERMINAR       = 250;
+const MIN_PARADO_SEGUNDOS  = 60;
+const MOVIMIENTO_MAX_M     = 30;
+const MIN_DURACION_ESPERA  = 20;
+const RESET_SIN_VISITA_MS  = 30*60*1000;
+const NEARBY_RADIUS_M      = 10000;
 
-/* ===================== Datos ===================== */
-const PARADAS = [
-  { id:"p1", nombre:"Puerta del Sol", municipio:"Madrid", barrio:"Centro", plazas:6, horario:"24h", lat:40.4168, lng:-3.7038 },
-  { id:"p2", nombre:"Estación Atocha", municipio:"Madrid", barrio:"Arganzuela", plazas:10, horario:"24h", lat:40.4066, lng:-3.6906 },
-  { id:"p3", nombre:"Aeropuerto T4", municipio:"Madrid", barrio:"Barajas", plazas:20, horario:"24h", lat:40.4936, lng:-3.5668 },
-  { id:"p4", nombre:"Plaza España", municipio:"Madrid", barrio:"Moncloa", plazas:5, horario:"24h", lat:40.4239, lng:-3.7123 },
-  { id:"p5", nombre:"Gran Vía", municipio:"Madrid", barrio:"Centro", plazas:4, horario:"06:00-24:00", lat:40.4203, lng:-3.7058 },
-  { id:"p6", nombre:"Nuevos Ministerios", municipio:"Madrid", barrio:"Chamberí", plazas:8, horario:"24h", lat:40.4464, lng:-3.6931 },
-];
-
-const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
-const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
-const NAV = [
-  { id:"home", label:"Inicio", emoji:"🏠" },
-  { id:"jornada", label:"Jornada", emoji:"🕒" },
-  { id:"servicios", label:"Servicios", emoji:"🚕" },
-  { id:"gastos", label:"Gastos", emoji:"⛽" },
-  { id:"paradas", label:"Paradas", emoji:"📍" },
-  { id:"dashboard", label:"Panel", emoji:"📊" },
+/* ===================== Catálogo de paradas ===================== */
+const PARADAS_CATALOGO = [
+  /* --- Madrid capital --- */
+  { id:"m01", nombre:"Puerta del Sol", municipio:"Madrid", barrio:"Centro", plazas:6, horario:"24h", lat:40.4168, lng:-3.7038 },
+  { id:"m02", nombre:"Estación de Atocha", municipio:"Madrid", barrio:"Arganzuela", plazas:12, horario:"24h", lat:40.4066, lng:-3.6906 },
+  { id:"m03", nombre:"Aeropuerto T4", municipio:"Madrid", barrio:"Barajas", plazas:20, horario:"24h", lat:40.4936, lng:-3.5668 },
+  { id:"m04", nombre:"Aeropuerto T1", municipio:"Madrid", barrio:"Barajas", plazas:14, horario:"24h", lat:40.4727, lng:-3.5610 },
+  { id:"m05", nombre:"Aeropuerto T2", municipio:"Madrid", barrio:"Barajas", plazas:12, horario:"24h", lat:40.4697, lng:-3.5705 },
+  { id:"m06", nombre:"Plaza de España", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:5, horario:"24h", lat:40.4239, lng:-3.7123 },
+  { id:"m07", nombre:"Gran Vía (Callao)", municipio:"Madrid", barrio:"Centro", plazas:4, horario:"06:00-24:00", lat:40.4200, lng:-3.7065 },
+  { id:"m08", nombre:"Nuevos Ministerios", municipio:"Madrid", barrio:"Chamberí", plazas:8, horario:"24h", lat:40.4464, lng:-3.6931 },
+  { id:"m09", nombre:"Avenida de América", municipio:"Madrid", barrio:"Chamartín", plazas:6, horario:"24h", lat:40.4383, lng:-3.6773 },
+  { id:"m10", nombre:"Príncipe Pío", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:7, horario:"24h", lat:40.4210, lng:-3.7187 },
+  { id:"m11", nombre:"Méndez Álvaro", municipio:"Madrid", barrio:"Arganzuela", plazas:5, horario:"24h", lat:40.3980, lng:-3.6895 },
+  { id:"m12", nombre:"Plaza de Castilla", municipio:"Madrid", barrio:"Tetuán", plazas:8, horario:"24h", lat:40.4667, lng:-3.6897 },
+  { id:"m13", nombre:"Estación de Chamartín", municipio:"Madrid", barrio:"Chamartín", plazas:10, horario:"24h", lat:40.4721, lng:-3.6825 },
+  { id:"m14", nombre:"Ópera", municipio:"Madrid", barrio:"Centro", plazas:4, horario:"24h", lat:40.4181, lng:-3.7104 },
+  { id:"m15", nombre:"Tribunal", municipio:"Madrid", barrio:"Centro", plazas:3, horario:"24h", lat:40.4267, lng:-3.7014 },
+  { id:"m16", nombre:"Alonso Martínez", municipio:"Madrid", barrio:"Chamberí", plazas:4, horario:"24h", lat:40.4288, lng:-3.6986 },
+  { id:"m17", nombre:"Colón", municipio:"Madrid", barrio:"Salamanca", plazas:5, horario:"24h", lat:40.4263, lng:-3.6917 },
+  { id:"m18", nombre:"Serrano", municipio:"Madrid", barrio:"Salamanca", plazas:3, horario:"24h", lat:40.4280, lng:-3.6868 },
+  { id:"m19", nombre:"Goya", municipio:"Madrid", barrio:"Salamanca", plazas:4, horario:"24h", lat:40.4246, lng:-3.6768 },
+  { id:"m20", nombre:"Retiro (Puerta de Alcalá)", municipio:"Madrid", barrio:"Retiro", plazas:5, horario:"24h", lat:40.4200, lng:-3.6889 },
+  { id:"m21", nombre:"Diego de León", municipio:"Madrid", barrio:"Chamberí", plazas:4, horario:"24h", lat:40.4333, lng:-3.6747 },
+  { id:"m22", nombre:"Ventas", municipio:"Madrid", barrio:"Salamanca", plazas:6, horario:"24h", lat:40.4320, lng:-3.6640 },
+  { id:"m23", nombre:"Manuel Becerra", municipio:"Madrid", barrio:"Salamanca", plazas:4, horario:"24h", lat:40.4280, lng:-3.6694 },
+  { id:"m24", nombre:"Las Rosas", municipio:"Madrid", barrio:"San Blas-Canillejas", plazas:4, horario:"24h", lat:40.4230, lng:-3.6100 },
+  { id:"m25", nombre:"Canillejas", municipio:"Madrid", barrio:"San Blas-Canillejas", plazas:5, horario:"24h", lat:40.4430, lng:-3.6110 },
+  { id:"m26", nombre:"Vicálvaro", municipio:"Madrid", barrio:"Vicálvaro", plazas:4, horario:"24h", lat:40.4050, lng:-3.6100 },
+  { id:"m27", nombre:"Vallecas", municipio:"Madrid", barrio:"Puente de Vallecas", plazas:5, horario:"24h", lat:40.3830, lng:-3.6590 },
+  { id:"m28", nombre:"Villaverde Bajo", municipio:"Madrid", barrio:"Villaverde", plazas:4, horario:"24h", lat:40.3460, lng:-3.6920 },
+  { id:"m29", nombre:"Usera", municipio:"Madrid", barrio:"Usera", plazas:3, horario:"24h", lat:40.3810, lng:-3.7090 },
+  { id:"m30", nombre:"Carabanchel", municipio:"Madrid", barrio:"Carabanchel", plazas:4, horario:"24h", lat:40.3830, lng:-3.7290 },
+  { id:"m31", nombre:"Aluche", municipio:"Madrid", barrio:"Latina", plazas:5, horario:"24h", lat:40.3860, lng:-3.7640 },
+  { id:"m32", nombre:"Puerta del Ángel", municipio:"Madrid", barrio:"Latina", plazas:3, horario:"24h", lat:40.4140, lng:-3.7290 },
+  { id:"m33", nombre:"Moncloa", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:6, horario:"24h", lat:40.4350, lng:-3.7200 },
+  { id:"m34", nombre:"Ciudad Universitaria", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:5, horario:"24h", lat:40.4430, lng:-3.7270 },
+  { id:"m35", nombre:"Peñagrande", municipio:"Madrid", barrio:"Fuencarral-El Pardo", plazas:3, horario:"24h", lat:40.4680, lng:-3.7230 },
+  { id:"m36", nombre:"Mirasierra", municipio:"Madrid", barrio:"Fuencarral-El Pardo", plazas:4, horario:"24h", lat:40.4850, lng:-3.7130 },
+  { id:"m37", nombre:"Las Tablas", municipio:"Madrid", barrio:"Fuencarral-El Pardo", plazas:4, horario:"24h", lat:40.5000, lng:-3.6700 },
+  { id:"m38", nombre:"Sanchinarro", municipio:"Madrid", barrio:"Hortaleza", plazas:4, horario:"24h", lat:40.4900, lng:-3.6600 },
+  { id:"m39", nombre:"Hortaleza", municipio:"Madrid", barrio:"Hortaleza", plazas:3, horario:"24h", lat:40.4700, lng:-3.6400 },
+  { id:"m40", nombre:"Arturo Soria", municipio:"Madrid", barrio:"Ciudad Lineal", plazas:4, horario:"24h", lat:40.4500, lng:-3.6510 },
+  { id:"m41", nombre:"Ciudad Lineal", municipio:"Madrid", barrio:"Ciudad Lineal", plazas:3, horario:"24h", lat:40.4400, lng:-3.6400 },
+  { id:"m42", nombre:"Barajas Pueblo", municipio:"Madrid", barrio:"Barajas", plazas:4, horario:"24h", lat:40.4750, lng:-3.5800 },
+  /* --- Comunidad de Madrid --- */
+  { id:"c01", nombre:"Estación de Alcobendas-S.S. Reyes", municipio:"Alcobendas", barrio:"Centro", plazas:10, horario:"24h", lat:40.5408, lng:-3.6354 },
+  { id:"c02", nombre:"Hospital de Getafe", municipio:"Getafe", barrio:"Centro", plazas:8, horario:"24h", lat:40.3067, lng:-3.7333 },
+  { id:"c03", nombre:"Estación de Leganés Central", municipio:"Leganés", barrio:"Centro", plazas:10, horario:"24h", lat:40.3283, lng:-3.7638 },
+  { id:"c04", nombre:"Plaza de Cervantes", municipio:"Alcalá de Henares", barrio:"Centro", plazas:6, horario:"24h", lat:40.4821, lng:-3.3635 },
+  { id:"c05", nombre:"Estación de Móstoles Central", municipio:"Móstoles", barrio:"Centro", plazas:9, horario:"24h", lat:40.3228, lng:-3.8650 },
+  { id:"c06", nombre:"Estación de Alcorcón", municipio:"Alcorcón", barrio:"Centro", plazas:7, horario:"24h", lat:40.3450, lng:-3.8250 },
+  { id:"c07", nombre:"Estación de Fuenlabrada Central", municipio:"Fuenlabrada", barrio:"Centro", plazas:8, horario:"24h", lat:40.2840, lng:-3.7940 },
+  { id:"c08", nombre:"Avenida de España", municipio:"Las Rozas", barrio:"Centro", plazas:5, horario:"24h", lat:40.4921, lng:-3.8736 },
+  { id:"c09", nombre:"Estación de Pozuelo", municipio:"Pozuelo de Alarcón", barrio:"Centro", plazas:6, horario:"24h", lat:40.4348, lng:-3.8142 },
+  { id:"c10", nombre:"Estación de Majadahonda", municipio:"Majadahonda", barrio:"Centro", plazas:7, horario:"24h", lat:40.4730, lng:-3.8730 },
+  { id:"c11", nombre:"Estación de Boadilla", municipio:"Boadilla del Monte", barrio:"Centro", plazas:5, horario:"24h", lat:40.4060, lng:-3.8780 },
+  { id:"c12", nombre:"Torrejón de Ardoz Centro", municipio:"Torrejón de Ardoz", barrio:"Centro", plazas:6, horario:"24h", lat:40.4590, lng:-3.4790 },
+  { id:"c13", nombre:"Coslada Central", municipio:"Coslada", barrio:"Centro", plazas:5, horario:"24h", lat:40.4240, lng:-3.5610 },
+  { id:"c14", nombre:"San Fernando de Henares", municipio:"San Fernando de Henares", barrio:"Centro", plazas:4, horario:"24h", lat:40.4250, lng:-3.5320 },
+  { id:"c15", nombre:"Rivas Vaciamadrid Centro", municipio:"Rivas-Vaciamadrid", barrio:"Centro", plazas:5, horario:"24h", lat:40.3310, lng:-3.5180 },
+  { id:"c16", nombre:"Arganda del Rey Centro", municipio:"Arganda del Rey", barrio:"Centro", plazas:4, horario:"24h", lat:40.3010, lng:-3.4380 },
+  { id:"c17", nombre:"Colmenar Viejo Centro", municipio:"Colmenar Viejo", barrio:"Centro", plazas:4, horario:"24h", lat:40.6592, lng:-3.7658 },
+  { id:"c18", nombre:"Tres Cantos Centro", municipio:"Tres Cantos", barrio:"Centro", plazas:5, horario:"24h", lat:40.6010, lng:-3.7110 },
+  { id:"c19", nombre:"Collado Villalba Centro", municipio:"Collado Villalba", barrio:"Centro", plazas:5, horario:"24h", lat:40.6300, lng:-4.0080 },
+  { id:"c20", nombre:"San Lorenzo de El Escorial", municipio:"San Lorenzo de El Escorial", barrio:"Centro", plazas:4, horario:"24h", lat:40.5930, lng:-4.1470 },
+  { id:"c21", nombre:"Parla Centro", municipio:"Parla", barrio:"Centro", plazas:5, horario:"24h", lat:40.2370, lng:-3.7690 },
+  { id:"c22", nombre:"Pinto Centro", municipio:"Pinto", barrio:"Centro", plazas:4, horario:"24h", lat:40.2460, lng:-3.7000 },
+  { id:"c23", nombre:"Valdemoro Centro", municipio:"Valdemoro", barrio:"Centro", plazas:4, horario:"24h", lat:40.1910, lng:-3.6770 },
+  { id:"c24", nombre:"Aranjuez Centro", municipio:"Aranjuez", barrio:"Centro", plazas:4, horario:"24h", lat:40.0310, lng:-3.6030 },
 ];
 
 /* ===================== Estado ===================== */
-const STORAGE_KEY = "taxidiario-v2";
+const STORAGE_KEY = "taxidiario-v5";
 const state = {
-  view: "home", conductor:"", matricula:"",
-  services: [], gastos: [], jornadas: [], jornadaActivaId:null,
-  waitRecords: {},
-  activeWait: null,
-  p2pRoomName: "",
+  view:"home", conductor:"", matricula:"",
+  services:[], gastos:[], jornadas:[], jornadaActivaId:null,
+  waitRecords:{}, activeWait:null,
+  paradasUsuario:[],
+  expandedJornadaId:null,
 };
 
 function load() {
@@ -83,22 +128,10 @@ function load() {
   if (state.activeWait) {
     proximityState[state.activeWait.paradaId] = { status:"waiting", startTime: state.activeWait.startTime, lastSeen: Date.now() };
   }
-  cleanupOldRecords();
 }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
 function uid(p){ return `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`; }
-
-function cleanupOldRecords() {
-  const now = Date.now();
-  if (!state.waitRecords) state.waitRecords = {};
-  Object.keys(proximityState).forEach(id => {
-    const st = proximityState[id];
-    if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
-      delete proximityState[id];
-      if (state.waitRecords[id]) state.waitRecords[id] = [];
-    }
-  });
-}
+function getAllParadas() { return [...PARADAS_CATALOGO, ...state.paradasUsuario]; }
 
 /* ===================== Formato ===================== */
 const euro = new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"});
@@ -118,7 +151,7 @@ function startOfDay(ts=Date.now()){ const d=new Date(ts); d.setHours(0,0,0,0); r
 function startOfWeek(ts=Date.now()){ const d=new Date(startOfDay(ts)); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.getTime(); }
 function esc(s){ return String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-/* ===================== Geo utilidades ===================== */
+/* ===================== Geo ===================== */
 function distanceMeters(lat1,lon1,lat2,lon2){
   const R=6371000, toRad=d=>d*Math.PI/180;
   const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
@@ -126,134 +159,43 @@ function distanceMeters(lat1,lon1,lat2,lon2){
   return 2*R*Math.asin(Math.sqrt(a));
 }
 
-/* ===================== Estado de proximidad ===================== */
 const proximityState = {};
+const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
+const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
 
-/* ===================== P2P (Trystero / Nostr) ===================== */
-const p2p = {
-  active:false, room:null, roomName:"",
-  sendPos:null, sendStatus:null,
-  peers:new Map(),
-  peerMarkers:new Map(),
-  interval:null,
-};
-
-async function joinP2P(roomName) {
-  if (!roomName) { showToast("Pon un nombre de sala (ej: madrid-centro)"); return false; }
-  const m = await window.__trysteroPromise;
-  if (!m || !m.joinRoom) { showToast("⚠️ Red P2P no disponible (revisa conexión)"); return false; }
-
-  if (p2p.room) { try { p2p.room.leave(); } catch(e){} }
-  if (p2p.interval) clearInterval(p2p.interval);
-  p2p.peers.clear();
-  p2p.peerMarkers.forEach(mk => { try { map && map.removeLayer(mk); } catch(e){} });
-  p2p.peerMarkers.clear();
-
-  try {
-    p2p.room = m.joinRoom({ appId: "taxidiario-p2p-v1" }, roomName);
-  } catch(e) {
-    showToast("⚠️ No se pudo entrar a la sala");
-    return false;
-  }
-  p2p.roomName = roomName;
-  state.p2pRoomName = roomName;
-  save();
-
-  const [sendPos, getPos]       = p2p.room.makeAction("pos");
-  const [sendStatus, getStatus] = p2p.room.makeAction("status");
-  p2p.sendPos = sendPos;
-  p2p.sendStatus = sendStatus;
-
-  getPos((data, peerId) => {
-    const p = p2p.peers.get(peerId) || {};
-    Object.assign(p, { lat:data.lat, lng:data.lng, acc:data.acc, name:data.name, lastUpdate:Date.now() });
-    p2p.peers.set(peerId, p);
-    if (state.view === "paradas") renderParadaStats();
-  });
-  getStatus((data, peerId) => {
-    const p = p2p.peers.get(peerId) || {};
-    Object.assign(p, { paradaId:data.paradaId, waitingSince:data.waitingSince, lastUpdate:Date.now() });
-    p2p.peers.set(peerId, p);
-    if (state.view === "paradas") renderParadaStats();
-  });
-
-  p2p.room.onPeerJoin(peerId => { broadcastPosition(); });
-  p2p.room.onPeerLeave(peerId => {
-    p2p.peers.delete(peerId);
-    if (state.view === "paradas") renderParadaStats();
-  });
-
-  p2p.active = true;
-  p2p.interval = setInterval(broadcastPosition, P2P_ENVIO_CADA_MS);
-  broadcastPosition();
-  showToast(`📡 Conectado a "${roomName}"`);
-  if (state.view === "paradas") render();
-  return true;
-}
-
-function leaveP2P() {
-  if (p2p.room) { try { p2p.room.leave(); } catch(e){} }
-  if (p2p.interval) clearInterval(p2p.interval);
-  p2p.peerMarkers.clear();
-  p2p.peers.clear();
-  p2p.active = false;
-  p2p.room = null;
-  p2p.interval = null;
-  showToast("📴 Desconectado de la red");
-  if (state.view === "paradas") render();
-}
-
-function broadcastPosition() {
-  if (!p2p.active || !p2p.sendPos) return;
-  if (lastPosition) {
-    p2p.sendPos({
-      lat: lastPosition.lat, lng: lastPosition.lng,
-      acc: Math.round(lastPosition.accuracy || 0),
-      name: state.conductor || "Taxi",
-    }).catch(()=>{});
-  }
-  if (p2p.sendStatus) {
-    p2p.sendStatus({
-      paradaId: state.activeWait?.paradaId || null,
-      waitingSince: state.activeWait?.startTime || null,
-    }).catch(()=>{});
-  }
-}
-
-// Ya NO se dibujan otros taxis en el mapa. Solo contador anónimo.
-function updatePeersOnMap() {
-  p2p.peerMarkers.forEach((mk) => { try { map && map.removeLayer(mk); } catch(e){} });
-  p2p.peerMarkers.clear();
-}
-
-function peersEnParada(paradaId) {
-  const now = Date.now();
-  let n = 0;
-  p2p.peers.forEach(p => {
-    if (p.paradaId === paradaId && now - p.lastUpdate < P2P_PEER_ACTIVO_MS) n++;
-  });
-  return n;
-}
-
-/* ===================== Filtro de paradas cercanas ===================== */
-function getParadasCercanas() {
-  if (!lastPosition) return PARADAS;
-  return PARADAS.filter(p => distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) < NEARBY_RADIUS_M);
-}
-
-/* ===================== Render ===================== */
+/* ===================== Render raíz ===================== */
 const root = document.getElementById("root");
+let map = null, userMarker = null, userCircle = null;
+let paradaMarkers = {};
+let lastPosition = null, watchId = null;
+let activeCharts = [];
+
+function destroyCharts() {
+  activeCharts.forEach(c => { try { c.destroy(); } catch(e){} });
+  activeCharts = [];
+}
 
 function render() {
   const views = { home:renderHome, jornada:renderJornada, servicios:renderServicios, gastos:renderGastos, paradas:renderParadas, dashboard:renderDashboard };
   const renderView = views[state.view] || renderHome;
+
+  if (map) { try { map.remove(); } catch(e){} map = null; }
+  paradaMarkers = {}; userMarker = null; userCircle = null;
+  destroyCharts();
 
   root.innerHTML = `
     <div class="min-h-screen flex flex-col max-w-md mx-auto relative">
       <div id="waiting-banner" class="hidden"></div>
       <main class="flex-1 pb-20 overflow-y-auto" id="main-view"></main>
       <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-6">
-        ${NAV.map(n => `
+        ${[
+          { id:"home", label:"Inicio", emoji:"🏠" },
+          { id:"jornada", label:"Jornada", emoji:"🕒" },
+          { id:"servicios", label:"Servicios", emoji:"🚕" },
+          { id:"gastos", label:"Gastos", emoji:"⛽" },
+          { id:"paradas", label:"Paradas", emoji:"📍" },
+          { id:"dashboard", label:"Panel", emoji:"📊" },
+        ].map(n => `
           <button data-nav="${n.id}" class="flex flex-col items-center justify-center py-2 text-[10px] gap-0.5 ${state.view===n.id?"text-brand-500":"text-neutral-500"}">
             <span class="text-lg">${n.emoji}</span>${n.label}
           </button>`).join("")}
@@ -264,6 +206,9 @@ function render() {
   root.querySelectorAll("[data-nav]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.nav; save(); render(); }));
   bindViewEvents();
   updateWaitingBanner();
+
+  if (state.view === "paradas") requestAnimationFrame(() => { initMap(); });
+  if (state.view === "jornada") requestAnimationFrame(() => { initJornadaCharts(); });
 }
 
 /* ---------- Home ---------- */
@@ -302,6 +247,7 @@ function renderHome() {
 function renderJornada() {
   const activa = state.jornadas.find(j => j.id === state.jornadaActivaId);
   const historial = state.jornadas.filter(j => j.endedAt);
+
   const bloque = activa ? `
     <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
       <div class="text-sm text-neutral-400">Iniciada ${formatDateTime(activa.startedAt)}</div>
@@ -314,25 +260,185 @@ function renderJornada() {
       <input id="kmInicio" placeholder="Km inicial (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
       <button id="btn-ini-jornada" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Iniciar jornada</button>
     </div>`;
+
   return `
     <div class="p-4 space-y-4">
       <h2 class="text-lg font-bold">Jornada</h2>
       ${bloque}
+      ${activa ? renderJornadaResumen(activa, "Resumen del turno en curso") : ""}
       <div>
         <h3 class="text-sm font-semibold text-neutral-400 mb-2">Historial</h3>
         <div class="space-y-2">
           ${historial.length===0 ? `<p class="text-sm text-neutral-500">Aún no hay jornadas finalizadas.</p>` :
-            historial.map(j => `
-              <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between">
+            historial.map(j => {
+              const expanded = state.expandedJornadaId === j.id;
+              return `
                 <div>
-                  <div class="font-medium">${formatDateTime(j.startedAt)}</div>
-                  <div class="text-neutral-500 text-xs">${j.kmInicio!=null && j.kmFin!=null ? (j.kmFin-j.kmInicio)+" km" : ""}</div>
-                </div>
-                <div class="text-neutral-400">${formatDuration(((j.endedAt??0)-j.startedAt)/1000)}</div>
-              </div>`).join("")}
+                  <button data-toggle-jornada="${j.id}" class="w-full rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between items-center">
+                    <div class="text-left">
+                      <div class="font-medium">${formatDateTime(j.startedAt)}</div>
+                      <div class="text-neutral-500 text-xs">${j.kmInicio!=null && j.kmFin!=null ? (j.kmFin-j.kmInicio)+" km" : ""}</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-neutral-400">${formatDuration(((j.endedAt??0)-j.startedAt)/1000)}</span>
+                      <span class="text-xs text-brand-500">${expanded?"▲":"▼"}</span>
+                    </div>
+                  </button>
+                  ${expanded ? `<div class="mt-2">${renderJornadaResumen(j, "Resumen del turno")}</div>` : ""}
+                </div>`;
+            }).join("")}
         </div>
       </div>
     </div>`;
+}
+
+function getJornadaData(jornada) {
+  const svcs = state.services.filter(s => s.jornadaId === jornada.id);
+  const gst  = state.gastos.filter(g => g.jornadaId === jornada.id);
+  const ingresos = svcs.reduce((sum, s) => sum + s.importe + s.propina, 0);
+  const gastosTot = gst.reduce((sum, g) => sum + g.importe, 0);
+  const neto = ingresos - gastosTot;
+  const media = svcs.length ? ingresos / svcs.length : 0;
+  const duracion = ((jornada.endedAt ?? Date.now()) - jornada.startedAt) / 1000;
+  const porHora = duracion > 0 ? ingresos / (duracion/3600) : 0;
+  return { svcs, gst, ingresos, gastosTot, neto, media, duracion, porHora };
+}
+
+function renderJornadaResumen(jornada, titulo) {
+  const d = getJornadaData(jornada);
+  const sinDatos = d.svcs.length === 0 && d.gst.length === 0;
+  return `
+    <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-neutral-300">📊 ${titulo}</h3>
+        <span class="text-xs text-neutral-500">${formatDuration(d.duracion)}</span>
+      </div>
+      ${sinDatos ? `<p class="text-sm text-neutral-500 text-center py-3">Sin actividad todavía. Registra un servicio o gasto.</p>` : `
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-gradient-to-br from-brand-500/20 to-brand-600/10 border border-brand-500/30 p-3">
+          <div class="text-[10px] text-neutral-400 uppercase tracking-wide">Ingresos</div>
+          <div class="text-lg font-bold text-brand-500">${formatEuro(d.ingresos)}</div>
+        </div>
+        <div class="rounded-lg bg-neutral-800 p-3">
+          <div class="text-[10px] text-neutral-400 uppercase tracking-wide">Gastos</div>
+          <div class="text-lg font-bold text-red-400">${formatEuro(d.gastosTot)}</div>
+        </div>
+        <div class="rounded-lg bg-neutral-800 p-3">
+          <div class="text-[10px] text-neutral-400 uppercase tracking-wide">Neto</div>
+          <div class="text-lg font-bold ${d.neto >= 0 ? 'text-green-400' : 'text-red-400'}">${formatEuro(d.neto)}</div>
+        </div>
+        <div class="rounded-lg bg-neutral-800 p-3">
+          <div class="text-[10px] text-neutral-400 uppercase tracking-wide">Servicios</div>
+          <div class="text-lg font-bold">${d.svcs.length}</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-neutral-800/60 p-2.5">
+          <div class="text-[10px] text-neutral-500 uppercase">Media/servicio</div>
+          <div class="text-sm font-semibold">${formatEuro(d.media)}</div>
+        </div>
+        <div class="rounded-lg bg-neutral-800/60 p-2.5">
+          <div class="text-[10px] text-neutral-500 uppercase">€ / hora</div>
+          <div class="text-sm font-semibold">${formatEuro(d.porHora)}</div>
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] text-neutral-500 uppercase tracking-wide mb-1">Ingresos por hora</div>
+        <div style="height:130px; position:relative;"><canvas id="chart-horas-${jornada.id}"></canvas></div>
+      </div>
+      ${d.gst.length > 0 ? `
+      <div>
+        <div class="text-[10px] text-neutral-500 uppercase tracking-wide mb-1">Desglose de gastos</div>
+        <div style="height:170px; position:relative;"><canvas id="chart-gastos-${jornada.id}"></canvas></div>
+      </div>` : ""}
+      `}
+    </div>`;
+}
+
+function initJornadaCharts() {
+  destroyCharts();
+  if (typeof Chart === "undefined") return;
+
+  document.querySelectorAll('canvas[id^="chart-horas-"]').forEach(canvas => {
+    const jornadaId = canvas.id.replace("chart-horas-","");
+    const jornada = state.jornadas.find(j => j.id === jornadaId);
+    if (!jornada) return;
+    const d = getJornadaData(jornada);
+
+    const startHour = new Date(jornada.startedAt).getHours();
+    const endHour = new Date(jornada.endedAt ?? Date.now()).getHours();
+    const horas = [];
+    for (let h = startHour; h <= endHour; h++) horas.push(h);
+    if (horas.length === 0) horas.push(startHour);
+
+    const ingresosHora = horas.map(h =>
+      d.svcs.filter(s => new Date(s.at).getHours() === h)
+            .reduce((sum, s) => sum + s.importe + s.propina, 0)
+    );
+    const serviciosHora = horas.map(h =>
+      d.svcs.filter(s => new Date(s.at).getHours() === h).length
+    );
+
+    const chart = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: horas.map(h => String(h).padStart(2,"0")+"h"),
+        datasets: [{
+          data: ingresosHora,
+          backgroundColor: "#f5b400",
+          borderRadius: 4,
+          maxBarThickness: 34,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => {
+            const n = serviciosHora[ctx.dataIndex];
+            return [`${formatEuro(ctx.parsed.y)}`, `${n} servicio${n===1?"":"s"}`];
+          }}}
+        },
+        scales: {
+          x: { ticks: { color:"#888", font:{size:9} }, grid: { display:false } },
+          y: { ticks: { color:"#888", font:{size:9}, callback: v => v+"€" }, grid: { color:"#222" }, beginAtZero: true }
+        }
+      }
+    });
+    activeCharts.push(chart);
+  });
+
+  document.querySelectorAll('canvas[id^="chart-gastos-"]').forEach(canvas => {
+    const jornadaId = canvas.id.replace("chart-gastos-","");
+    const jornada = state.jornadas.find(j => j.id === jornadaId);
+    if (!jornada) return;
+    const d = getJornadaData(jornada);
+    if (d.gst.length === 0) return;
+
+    const colores = { combustible:"#f5b400", peaje:"#3b82f6", comida:"#22c55e", parking:"#a855f7", lavado:"#06b6d4", otros:"#888" };
+    const tipos = {};
+    d.gst.forEach(g => { tipos[g.tipo] = (tipos[g.tipo]||0) + g.importe; });
+
+    const chart = new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels: Object.keys(tipos).map(t => GASTO_LABEL[t] || t),
+        datasets: [{
+          data: Object.values(tipos),
+          backgroundColor: Object.keys(tipos).map(t => colores[t] || "#888"),
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: "62%",
+        plugins: {
+          legend: { position:"bottom", labels: { color:"#ccc", font:{size:10}, boxWidth:12, padding:6 } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatEuro(ctx.parsed)}` } }
+        }
+      }
+    });
+    activeCharts.push(chart);
+  });
 }
 
 /* ---------- Servicios ---------- */
@@ -362,7 +468,7 @@ function renderServicios() {
             <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between items-start">
               <div>
                 <div class="font-medium">${esc(s.origen)} → ${esc(s.destino)}</div>
-                <div class="text-neutral-500 text-xs mt-0.5">${formatTime(s.at)} · ${PAGO_LABEL[s.pago]} · ${s.pasajeros} pax</div>
+                <div class="text-neutral-500 text-xs mt-0.5">${formatTime(s.at)} · ${PAGO_LABEL[s.pago]||s.pago} · ${s.pasajeros} pax</div>
               </div>
               <div class="text-right">
                 <div class="font-semibold">${formatEuro(s.importe+s.propina)}</div>
@@ -403,47 +509,36 @@ function renderGastos() {
     </div>`;
 }
 
-/* ---------- Paradas (mapa + geolocalización + P2P anónimo) ---------- */
+/* ---------- Paradas ---------- */
 function renderParadas() {
-  const p2pOn = p2p.active;
-  const nPeers = Array.from(p2p.peers.values()).filter(p => Date.now() - p.lastUpdate < P2P_PEER_ACTIVO_MS).length;
-  const nCercanas = getParadasCercanas().length;
+  const total = getAllParadas().length;
+  const propias = state.paradasUsuario.length;
   return `
     <div class="p-4 space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-bold">Paradas</h2>
-        <button id="btn-centrar" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">📍 Centrar</button>
-      </div>
-
-      <div class="rounded-xl bg-neutral-900 border ${p2pOn?"border-green-600":"border-neutral-800"} p-3 space-y-2">
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold flex items-center gap-2">
-            <span class="h-2 w-2 rounded-full ${p2pOn?"bg-green-500 animate-pulse":"bg-neutral-600"}"></span>
-            Red P2P ${p2pOn ? `· ${nPeers} ${nPeers===1?"taxi":"taxis"} en la sala` : "· desconectado"}
-          </div>
-          ${p2pOn ? `<button id="btn-p2p-leave" class="text-xs text-red-400">Salir</button>` : ""}
+        <div class="flex gap-2">
+          <button id="btn-centrar" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">📍 Centrar</button>
+          <button id="btn-add-parada" class="text-xs rounded-full bg-green-600 px-3 py-1 font-semibold">+ Añadir</button>
         </div>
-        ${!p2pOn ? `
-          <div class="flex gap-2">
-            <input id="p2p-room" placeholder="Sala (ej: madrid-centro)" value="${esc(state.p2pRoomName||"")}" class="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-            <button id="btn-p2p-join" class="rounded-lg bg-green-600 hover:bg-green-500 px-3 text-sm font-semibold">Entrar</button>
-          </div>
-          <p class="text-[11px] text-neutral-500">Sirve solo para ver cuántos taxis hay en cada parada. No se muestran posiciones ni identidades.</p>
-        ` : `
-          <p class="text-[11px] text-neutral-500">Sala: <b>${esc(p2p.roomName)}</b> · anónimo. Solo se comparte si estás en una parada.</p>
-        `}
       </div>
 
       <div class="rounded-xl overflow-hidden border border-neutral-800">
         <div id="map"></div>
       </div>
-      <div id="geo-status" class="text-xs text-neutral-500"></div>
-      <input id="paradas-q" placeholder="Buscar parada, barrio..." class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-      <div class="text-xs text-neutral-500">${nCercanas} parada${nCercanas===1?"":"s"} a menos de ${NEARBY_RADIUS_M/1000} km</div>
+      <div id="geo-status" class="text-xs text-neutral-500">Pidiendo ubicación…</div>
+
+      <input id="paradas-q" placeholder="Buscar por nombre, barrio o municipio…" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+
+      <div class="flex items-center justify-between text-xs text-neutral-500">
+        <span>${total} paradas (${propias} tuyas)</span>
+        <span id="paradas-count"></span>
+      </div>
+
       <div class="space-y-2" id="paradas-lista"></div>
       <div id="parada-stats" class="space-y-2"></div>
       <p class="text-xs text-neutral-600">
-        Pregunta tras 1 min parado en un radio de ${RADIO_PREGUNTAR} m · Cierra la espera al superar ${RADIO_TERMINAR} m · Resetea registros tras 30 min sin visitar.
+        Pregunta tras 1 min parado a menos de ${RADIO_PREGUNTAR} m · Cierra la espera al superar ${RADIO_TERMINAR} m · Reset a los 30 min sin visitar.
       </p>
     </div>`;
 }
@@ -461,7 +556,7 @@ function renderDashboard() {
     </div>`;
 }
 
-/* ===================== Listeners ===================== */
+/* ===================== Eventos ===================== */
 function bindViewEvents() {
   root.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.go; save(); render(); }));
 
@@ -479,6 +574,11 @@ function bindViewEvents() {
       state.jornadas = state.jornadas.map(j => j.id===id ? { ...j, endedAt:Date.now(), kmFin: km?Number(km):j.kmFin } : j);
       state.jornadaActivaId = null; save(); render();
     });
+    root.querySelectorAll("[data-toggle-jornada]").forEach(b => b.addEventListener("click", () => {
+      const id = b.dataset.toggleJornada;
+      state.expandedJornadaId = state.expandedJornadaId === id ? null : id;
+      save(); render();
+    }));
   }
 
   if (state.view === "servicios") {
@@ -528,53 +628,65 @@ function bindViewEvents() {
   }
 
   if (state.view === "paradas") {
-    initMap();
-
-    const btnJoin = document.getElementById("btn-p2p-join");
-    if (btnJoin) btnJoin.addEventListener("click", async () => {
-      const name = document.getElementById("p2p-room").value.trim();
-      await joinP2P(name);
+    document.getElementById("btn-add-parada").addEventListener("click", () => mostrarFormularioParada());
+    document.getElementById("btn-centrar").addEventListener("click", () => {
+      if (lastPosition && map) map.setView([lastPosition.lat, lastPosition.lng], 16);
+      else initGeolocation(true);
     });
-    const btnLeave = document.getElementById("btn-p2p-leave");
-    if (btnLeave) btnLeave.addEventListener("click", () => leaveP2P());
 
     const input = document.getElementById("paradas-q");
     const lista = document.getElementById("paradas-lista");
+    const countEl = document.getElementById("paradas-count");
     const paint = (q="") => {
-      const cercanas = getParadasCercanas();
-      const filtered = cercanas.filter(p => `${p.nombre} ${p.barrio} ${p.municipio}`.toLowerCase().includes(q.toLowerCase()));
-      lista.innerHTML = filtered.length===0 ? `<p class="text-sm text-neutral-500">Sin paradas cerca.</p>` :
-        filtered.map(p => {
+      const todas = getAllParadas();
+      const conDist = todas.map(p => ({
+        p,
+        dist: lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null,
+      }));
+      const cercanas = lastPosition ? conDist.filter(x => x.dist < NEARBY_RADIUS_M) : conDist;
+      cercanas.sort((a,b) => (a.dist ?? 0) - (b.dist ?? 0));
+      const filtradas = q
+        ? cercanas.filter(x => `${x.p.nombre} ${x.p.barrio} ${x.p.municipio}`.toLowerCase().includes(q.toLowerCase()))
+        : cercanas;
+
+      if (countEl) countEl.textContent = `${filtradas.length} cerca`;
+
+      lista.innerHTML = filtradas.length===0 ? `<p class="text-sm text-neutral-500">No hay paradas a menos de ${NEARBY_RADIUS_M/1000} km.</p>` :
+        filtradas.map(({p, dist}) => {
           const st = proximityState[p.id];
           const activo = st && st.status === "waiting";
-          const peers = peersEnParada(p.id);
-          const dist = lastPosition ? Math.round(distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng)) : null;
+          const propia = state.paradasUsuario.some(x => x.id === p.id);
           return `
             <div class="rounded-lg bg-neutral-900 border ${activo?"border-brand-500":"border-neutral-800"} p-3">
               <div class="flex justify-between items-start gap-2">
                 <div class="flex-1">
                   <div class="font-medium flex items-center gap-2 flex-wrap">
                     ${activo?"⏱️ ":""}${esc(p.nombre)}
-                    ${peers>0?`<span class="text-[10px] rounded-full bg-green-600/20 text-green-400 px-2 py-0.5">${peers} taxi${peers>1?"s":""}</span>`:""}
+                    ${propia?`<span class="text-[10px] rounded-full bg-brand-500/20 text-brand-500 px-2 py-0.5">tuya</span>`:""}
                   </div>
-                  <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist} m`:""}</div>
+                  <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist < 1000 ? Math.round(dist)+" m" : (dist/1000).toFixed(1)+" km"}`:""}</div>
                   <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
                 </div>
-                <button data-ir-parada="${p.id}" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">Ir</button>
+                <div class="flex flex-col gap-1 items-end">
+                  <button data-ir-parada="${p.id}" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-3 py-1 text-brand-500">Ir</button>
+                  ${propia?`<button data-del-parada="${p.id}" class="text-xs text-red-400">Borrar</button>`:""}
+                </div>
               </div>
             </div>`;
         }).join("");
+
       lista.querySelectorAll("[data-ir-parada]").forEach(b => b.addEventListener("click", () => {
-        const p = PARADAS.find(x => x.id === b.dataset.irParada);
-        if (p && map) map.setView([p.lat, p.lng], 17);
+        const p = getAllParadas().find(x => x.id === b.dataset.irParada);
+        if (p && map) { map.setView([p.lat, p.lng], 17); setTimeout(()=>map.invalidateSize(), 50); }
+      }));
+      lista.querySelectorAll("[data-del-parada]").forEach(b => b.addEventListener("click", () => {
+        if (!confirm("¿Borrar esta parada que añadiste?")) return;
+        state.paradasUsuario = state.paradasUsuario.filter(x => x.id !== b.dataset.delParada);
+        save(); render();
       }));
     };
     paint();
     input.addEventListener("input", () => paint(input.value));
-    document.getElementById("btn-centrar").addEventListener("click", () => {
-      if (lastPosition && map) map.setView([lastPosition.lat, lastPosition.lng], 16);
-      else initGeolocation();
-    });
     renderParadaStats();
   }
 
@@ -607,39 +719,126 @@ function bindViewEvents() {
   }
 }
 
-/* ===================== Mapa ===================== */
-let map = null, userMarker = null, userCircle = null;
-let paradaMarkers = {};
-let lastPosition = null, watchId = null;
+/* ===================== Formulario añadir parada ===================== */
+function mostrarFormularioParada() {
+  const modal = document.createElement("div");
+  modal.id = "modal-add-parada";
+  modal.className = "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4";
+  modal.innerHTML = `
+    <div class="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <h3 class="text-lg font-bold">Añadir parada</h3>
+      <div class="space-y-3">
+        <input id="np-nombre" placeholder="Nombre de la parada *" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <input id="np-direccion" placeholder="Dirección (ej: Calle Mayor, 1)" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <input id="np-municipio" placeholder="Municipio" value="Madrid" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <div class="grid grid-cols-2 gap-2">
+          <input id="np-plazas" placeholder="Plazas" inputmode="numeric" value="4" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <input id="np-horario" placeholder="Horario" value="24h" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        </div>
+        <p class="text-xs text-neutral-500">Coordenadas (se obtienen solas si buscas la dirección):</p>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="np-lat" placeholder="Latitud" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <input id="np-lng" placeholder="Longitud" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        </div>
+        <button id="np-geocode" class="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2 text-sm font-medium">🔍 Obtener coordenadas de la dirección</button>
+      </div>
+      <div class="flex gap-2">
+        <button id="np-cancel" class="flex-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 font-medium">Cancelar</button>
+        <button id="np-save" class="flex-1 rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Guardar</button>
+      </div>
+      <p id="np-status" class="text-xs text-neutral-500 text-center min-h-[1rem]"></p>
+    </div>`;
+  document.body.appendChild(modal);
 
+  const setStatus = (t) => { const el = document.getElementById("np-status"); if (el) el.textContent = t; };
+
+  document.getElementById("np-cancel").addEventListener("click", () => modal.remove());
+
+  document.getElementById("np-geocode").addEventListener("click", async () => {
+    const dir = document.getElementById("np-direccion").value.trim();
+    const mun = document.getElementById("np-municipio").value.trim();
+    if (!dir) { setStatus("Escribe una dirección primero."); return; }
+    setStatus("Buscando…");
+    try {
+      const q = encodeURIComponent(`${dir}, ${mun}, España`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`, { headers: { "Accept": "application/json" } });
+      const data = await res.json();
+      if (data && data.length > 0) {
+        document.getElementById("np-lat").value = Number(data[0].lat).toFixed(6);
+        document.getElementById("np-lng").value = Number(data[0].lon).toFixed(6);
+        setStatus(`✅ ${data[0].display_name}`);
+      } else {
+        setStatus("⚠️ No se encontró. Prueba con 'Calle X, nº, municipio'.");
+      }
+    } catch (e) {
+      setStatus("⚠️ Error al buscar. Revisa la conexión.");
+    }
+  });
+
+  document.getElementById("np-save").addEventListener("click", () => {
+    const nombre = document.getElementById("np-nombre").value.trim();
+    const municipio = document.getElementById("np-municipio").value.trim() || "—";
+    const barrio = document.getElementById("np-direccion").value.trim() || "—";
+    const plazas = Number(document.getElementById("np-plazas").value) || 1;
+    const horario = document.getElementById("np-horario").value.trim() || "24h";
+    const lat = parseFloat(document.getElementById("np-lat").value);
+    const lng = parseFloat(document.getElementById("np-lng").value);
+
+    if (!nombre) { setStatus("El nombre es obligatorio."); return; }
+    if (isNaN(lat) || isNaN(lng)) { setStatus("Faltan coordenadas. Pulsa 'Obtener coordenadas'."); return; }
+
+    state.paradasUsuario.push({ id: uid("usr"), nombre, municipio, barrio, plazas, horario, lat, lng });
+    save();
+    modal.remove();
+    showToast(`✅ "${nombre}" añadida`);
+    render();
+  });
+}
+
+/* ===================== Mapa ===================== */
 function initMap() {
-  if (!document.getElementById("map")) return;
-  if (map) { map.remove(); map = null; paradaMarkers = {}; userMarker = null; userCircle = null; }
+  const el = document.getElementById("map");
+  if (!el) return;
+  if (map) { try { map.remove(); } catch(e){} map = null; }
+  paradaMarkers = {}; userMarker = null; userCircle = null;
+
   const center = lastPosition ? [lastPosition.lat, lastPosition.lng] : [40.4168, -3.7038];
-  map = L.map("map", { zoomControl:true }).setView(center, 13);
+  try {
+    map = L.map("map", { zoomControl:true }).setView(center, lastPosition ? 14 : 11);
+  } catch(e) { console.error("Error creando mapa:", e); return; }
   L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     attribution: '&copy; OpenStreetMap &copy; CARTO',
     subdomains: "abcd", maxZoom: 20,
   }).addTo(map);
+
+  setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+
+  const todas = getAllParadas();
+  const cercanas = lastPosition
+    ? todas.filter(p => distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) < NEARBY_RADIUS_M)
+    : todas;
 
   const paradaIcon = L.divIcon({
     className:"",
     html:`<div style="background:#f5b400;border:2px solid #1a1400;width:14px;height:14px;border-radius:50%;box-shadow:0 0 0 4px rgba(245,180,0,0.25)"></div>`,
     iconSize:[14,14], iconAnchor:[7,7],
   });
-  getParadasCercanas().forEach(p => {
+  cercanas.forEach(p => {
     paradaMarkers[p.id] = L.marker([p.lat, p.lng], { icon: paradaIcon })
       .addTo(map)
       .bindPopup(`<div style="color:#111"><b>${esc(p.nombre)}</b><br><span style="font-size:11px">${esc(p.barrio)} · ${p.plazas} plazas</span></div>`);
   });
 
   if (lastPosition) drawUser(lastPosition.lat, lastPosition.lng);
-  setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+  initGeolocation();
 }
 
 function refreshNearbyMarkers() {
   if (!map) return;
-  const cercanas = getParadasCercanas();
+  const todas = getAllParadas();
+  const cercanas = lastPosition
+    ? todas.filter(p => distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) < NEARBY_RADIUS_M)
+    : todas;
   const ids = new Set(cercanas.map(p => p.id));
 
   Object.keys(paradaMarkers).forEach(id => {
@@ -677,36 +876,44 @@ function drawUser(lat, lng) {
 }
 
 /* ===================== Geolocalización ===================== */
-function initGeolocation() {
+function initGeolocation(force=false) {
   if (!navigator.geolocation) {
     const s = document.getElementById("geo-status"); if (s) s.textContent = "⚠️ Tu navegador no soporta geolocalización.";
     return;
   }
-  if (watchId !== null) return;
+  if (watchId !== null && !force) return;
   watchId = navigator.geolocation.watchPosition(onPosition, onGeoError, {
     enableHighAccuracy: true, maximumAge: 5000, timeout: 20000,
   });
 }
 function onGeoError(err) {
   const s = document.getElementById("geo-status");
-  if (s) s.textContent = `⚠️ Error de ubicación: ${err.message}`;
+  const msg = err.code === 1 ? "Permiso de ubicación denegado." :
+              err.code === 2 ? "Ubicación no disponible." :
+              err.code === 3 ? "Tiempo de espera agotado." : err.message;
+  if (s) s.textContent = `⚠️ ${msg}`;
 }
 function onPosition(pos) {
   const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+  const first = !lastPosition;
   lastPosition = { lat, lng, accuracy };
   drawUser(lat, lng);
   const s = document.getElementById("geo-status");
-  if (s) s.textContent = `📍 Precisión ±${Math.round(accuracy)} m · actualizado ${formatTime(Date.now())}`;
+  if (s) s.textContent = `📍 Precisión ±${Math.round(accuracy)} m · ${formatTime(Date.now())}`;
   checkAllParadas(lat, lng);
   updateWaitingBanner();
-  if (state.view === "paradas" && map) refreshNearbyMarkers();
-  if (p2p.active) broadcastPosition();
+  if (state.view === "paradas") {
+    if (first && map) map.setView([lat, lng], 15);
+    refreshNearbyMarkers();
+    const input = document.getElementById("paradas-q");
+    if (input) input.dispatchEvent(new Event("input"));
+  }
 }
 
-/* ===================== Lógica de proximidad ===================== */
+/* ===================== Proximidad ===================== */
 function checkAllParadas(lat, lng) {
   const now = Date.now();
-  PARADAS.forEach(p => {
+  getAllParadas().forEach(p => {
     const d = distanceMeters(lat, lng, p.lat, p.lng);
     let st = proximityState[p.id];
     if (!st) st = proximityState[p.id] = { status:"idle", insideSince:null, anchor:null, lastSeen:null };
@@ -719,29 +926,20 @@ function checkAllParadas(lat, lng) {
 
     if (st.status === "idle") {
       if (d < RADIO_PREGUNTAR) {
-        if (!st.insideSince) {
-          st.insideSince = now;
-          st.anchor = { lat, lng };
-        } else {
+        if (!st.insideSince) { st.insideSince = now; st.anchor = { lat, lng }; }
+        else {
           const moved = distanceMeters(st.anchor.lat, st.anchor.lng, lat, lng);
-          if (moved > MOVIMIENTO_MAX_M) {
-            st.insideSince = now;
-            st.anchor = { lat, lng };
-          } else if (now - st.insideSince >= MIN_PARADO_SEGUNDOS * 1000) {
+          if (moved > MOVIMIENTO_MAX_M) { st.insideSince = now; st.anchor = { lat, lng }; }
+          else if (now - st.insideSince >= MIN_PARADO_SEGUNDOS * 1000) {
             st.status = "asking";
             askIfAtParada(p, d);
           }
         }
-      } else {
-        st.insideSince = null;
-        st.anchor = null;
-      }
+      } else { st.insideSince = null; st.anchor = null; }
     } else if (st.status === "waiting" && d > RADIO_TERMINAR) {
       finalizarEspera(p, st);
     } else if (st.status === "dismissed" && d > RADIO_PREGUNTAR + 30) {
-      st.status = "idle";
-      st.insideSince = null;
-      st.anchor = null;
+      st.status = "idle"; st.insideSince = null; st.anchor = null;
     }
   });
 }
@@ -772,11 +970,8 @@ function askIfAtParada(parada, dist) {
     st.status = "waiting";
     st.startTime = Date.now();
     state.activeWait = { paradaId: parada.id, startTime: st.startTime };
-    save();
-    modal.remove();
-    if (state.view === "paradas") render();
-    updateWaitingBanner();
-    if (p2p.active) broadcastPosition();
+    save(); modal.remove();
+    if (state.view === "paradas") render(); else updateWaitingBanner();
   });
   document.getElementById("modal-no").addEventListener("click", () => {
     proximityState[parada.id] = { status:"dismissed", lastSeen: Date.now() };
@@ -787,31 +982,26 @@ function askIfAtParada(parada, dist) {
 function finalizarEspera(parada, st) {
   const endTime = Date.now();
   const duration = (endTime - st.startTime) / 1000;
-  st.status = "dismissed";
-  st.startTime = null;
+  st.status = "dismissed"; st.startTime = null;
   state.activeWait = null;
 
-  if (duration < MIN_DURACION_ESPERA) { save(); updateWaitingBanner(); if (p2p.active) broadcastPosition(); return; }
+  if (duration < MIN_DURACION_ESPERA) { save(); updateWaitingBanner(); return; }
 
   if (!state.waitRecords) state.waitRecords = {};
   if (!state.waitRecords[parada.id]) state.waitRecords[parada.id] = [];
   state.waitRecords[parada.id].push({ start: st.startTime, end: endTime, duration });
-  if (state.waitRecords[parada.id].length > 500) {
-    state.waitRecords[parada.id] = state.waitRecords[parada.id].slice(-500);
-  }
+  if (state.waitRecords[parada.id].length > 500) state.waitRecords[parada.id] = state.waitRecords[parada.id].slice(-500);
   save();
-  showToast(`✅ Espera registrada en ${parada.nombre}: ${formatDuration(duration)}`);
-  if (state.view === "paradas") render();
-  else updateWaitingBanner();
-  if (p2p.active) broadcastPosition();
+  showToast(`✅ Espera en ${parada.nombre}: ${formatDuration(duration)}`);
+  if (state.view === "paradas") render(); else updateWaitingBanner();
 }
 
-/* ===================== Banner de espera activa ===================== */
+/* ===================== Banner y toast ===================== */
 function updateWaitingBanner() {
   const el = document.getElementById("waiting-banner");
   if (!el) return;
   if (!state.activeWait) { el.classList.add("hidden"); el.innerHTML = ""; return; }
-  const p = PARADAS.find(x => x.id === state.activeWait.paradaId);
+  const p = getAllParadas().find(x => x.id === state.activeWait.paradaId);
   if (!p) { el.classList.add("hidden"); return; }
   const secs = (Date.now() - state.activeWait.startTime) / 1000;
   el.className = "fixed top-0 left-0 right-0 max-w-md mx-auto z-[500] bg-brand-500 text-brand-900 px-4 py-2 flex items-center justify-between text-sm font-semibold shadow-lg";
@@ -833,25 +1023,22 @@ function renderParadaStats() {
   const records = state.waitRecords || {};
   const ids = Object.keys(records).filter(id => (records[id]||[]).length > 0);
   if (ids.length === 0) { el.innerHTML = ""; return; }
+  const todas = getAllParadas();
 
   el.innerHTML = `
     <h3 class="text-sm font-semibold text-neutral-400 mt-2">Tus estadísticas de espera</h3>
     ${ids.map(id => {
-      const p = PARADAS.find(x => x.id === id); if (!p) return "";
+      const p = todas.find(x => x.id === id); if (!p) return "";
       const list = records[id];
       const durs = list.map(r => r.duration);
       const avg = durs.reduce((a,b)=>a+b,0) / durs.length;
       const min = Math.min(...durs), max = Math.max(...durs);
       const last = list[list.length-1];
-      const peers = peersEnParada(p.id);
       return `
         <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 space-y-1">
           <div class="flex justify-between items-start">
             <div>
-              <div class="font-medium flex items-center gap-2">
-                ${esc(p.nombre)}
-                ${peers>0?`<span class="text-[10px] rounded-full bg-green-600/20 text-green-400 px-2 py-0.5">${peers} aquí</span>`:""}
-              </div>
+              <div class="font-medium">${esc(p.nombre)}</div>
               <div class="text-xs text-neutral-500">${list.length} ${list.length===1?"visita":"visitas"}</div>
             </div>
             <button data-reset="${id}" class="text-xs text-red-400">Borrar</button>
@@ -872,7 +1059,7 @@ function renderParadaStats() {
   }));
 }
 
-/* ===================== Ticks periódicos ===================== */
+/* ===================== Tick ===================== */
 setInterval(() => {
   if (state.view === "jornada" && state.jornadaActivaId) {
     const a = state.jornadas.find(j => j.id === state.jornadaActivaId);
@@ -882,17 +1069,15 @@ setInterval(() => {
   if (state.activeWait) updateWaitingBanner();
 
   const now = Date.now();
-  if (state.waitRecords) {
-    let changed = false;
-    Object.keys(proximityState).forEach(id => {
-      const st = proximityState[id];
-      if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
-        delete proximityState[id];
-        if (state.waitRecords[id] && state.waitRecords[id].length) { state.waitRecords[id] = []; changed = true; }
-      }
-    });
-    if (changed) { save(); if (state.view === "paradas") renderParadaStats(); }
-  }
+  let changed = false;
+  Object.keys(proximityState).forEach(id => {
+    const st = proximityState[id];
+    if (st.lastSeen && now - st.lastSeen > RESET_SIN_VISITA_MS) {
+      delete proximityState[id];
+      if (state.waitRecords && state.waitRecords[id] && state.waitRecords[id].length) { state.waitRecords[id] = []; changed = true; }
+    }
+  });
+  if (changed) { save(); if (state.view === "paradas") renderParadaStats(); }
 }, 1000);
 
 /* ===================== Arranque ===================== */
