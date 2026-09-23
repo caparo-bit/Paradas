@@ -1,13 +1,509 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>TaxiDiario</title>
-    <meta name="description" content="Controla tus jornadas, servicios, gastos y paradas de taxi" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>TaxiDiario</title>
+<meta name="description" content="Controla tus jornadas, servicios, gastos y paradas de taxi" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            50: "#fff8e6", 100: "#ffedb3", 400: "#ffc61a",
+            500: "#f5b400", 600: "#cc9600", 900: "#1a1400",
+          },
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html, body, #root { height: 100%; }
+  body {
+    background: #0b0b0d; color: #f5f5f5;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+  input, button { font-family: inherit; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* ===================== Datos ===================== */
+const PARADAS = [
+  { id: "p1", nombre: "Puerta del Sol", municipio: "Madrid", barrio: "Centro", plazas: 6, horario: "24h" },
+  { id: "p2", nombre: "Estación Atocha", municipio: "Madrid", barrio: "Arganzuela", plazas: 10, horario: "24h" },
+  { id: "p3", nombre: "Aeropuerto T4", municipio: "Madrid", barrio: "Barajas", plazas: 20, horario: "24h" },
+  { id: "p4", nombre: "Plaza España", municipio: "Madrid", barrio: "Moncloa", plazas: 5, horario: "24h" },
+  { id: "p5", nombre: "Gran Vía", municipio: "Madrid", barrio: "Centro", plazas: 4, horario: "06:00-24:00" },
+  { id: "p6", nombre: "Nuevos Ministerios", municipio: "Madrid", barrio: "Chamberí", plazas: 8, horario: "24h" },
+];
+
+const PAGO_LABEL = { efectivo: "Efectivo", tarjeta: "Tarjeta", app: "App" };
+const GASTO_LABEL = {
+  combustible: "Combustible", peaje: "Peaje", comida: "Comida",
+  parking: "Parking", lavado: "Lavado", otros: "Otros",
+};
+
+/* ===================== Estado ===================== */
+const STORAGE_KEY = "taxidiario-v1";
+
+const state = {
+  view: "home",
+  conductor: "",
+  matricula: "",
+  services: [],
+  gastos: [],
+  jornadas: [],
+  jornadaActivaId: null,
+};
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) Object.assign(state, JSON.parse(raw));
+  } catch (e) { console.warn("No se pudo cargar el estado:", e); }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { console.warn("No se pudo guardar:", e); }
+}
+function uid(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/* ===================== Utilidades de formato ===================== */
+const euro = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
+const timeFmt = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" });
+const dateTimeFmt = new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+const formatEuro = (n) => euro.format(n || 0);
+const formatTime = (ts) => timeFmt.format(ts);
+const formatDateTime = (ts) => dateTimeFmt.format(ts);
+function formatDuration(totalSec) {
+  const sec = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+}
+function startOfDay(ts = Date.now()) {
+  const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime();
+}
+function startOfWeek(ts = Date.now()) {
+  const d = new Date(startOfDay(ts));
+  const day = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - day);
+  return d.getTime();
+}
+
+/* ===================== Escapar HTML ===================== */
+function esc(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+/* ===================== Render principal ===================== */
+const root = document.getElementById("root");
+
+function render() {
+  const views = {
+    home: renderHome,
+    jornada: renderJornada,
+    servicios: renderServicios,
+    gastos: renderGastos,
+    paradas: renderParadas,
+    dashboard: renderDashboard,
+  };
+  const renderView = views[state.view] || renderHome;
+
+  root.innerHTML = `
+    <div class="min-h-screen flex flex-col max-w-md mx-auto">
+      <main class="flex-1 pb-20 overflow-y-auto" id="main-view"></main>
+      <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-5">
+        ${NAV.map((n) => `
+          <button data-nav="${n.id}" class="flex flex-col items-center justify-center py-2 text-[11px] gap-0.5 ${state.view === n.id ? "text-brand-500" : "text-neutral-500"}">
+            <span class="text-lg">${n.emoji}</span>${n.label}
+          </button>
+        `).join("")}
+      </nav>
+    </div>
+  `;
+
+  document.getElementById("main-view").innerHTML = renderView();
+
+  // listeners de navegación
+  root.querySelectorAll("[data-nav]").forEach((btn) => {
+    btn.addEventListener("click", () => { state.view = btn.dataset.nav; save(); render(); });
+  });
+
+  // listeners específicos de cada vista
+  bindViewEvents();
+}
+
+const NAV = [
+  { id: "home", label: "Inicio", emoji: "🏠" },
+  { id: "jornada", label: "Jornada", emoji: "🕒" },
+  { id: "servicios", label: "Servicios", emoji: "🚕" },
+  { id: "gastos", label: "Gastos", emoji: "⛽" },
+  { id: "dashboard", label: "Panel", emoji: "📊" },
+];
+
+/* ===================== Vistas ===================== */
+function renderHome() {
+  const CARDS = [
+    { id: "jornada", label: "Jornada", emoji: "🕒", desc: "Inicia o cierra tu turno" },
+    { id: "servicios", label: "Servicios", emoji: "🚕", desc: "Registra cada carrera" },
+    { id: "gastos", label: "Gastos", emoji: "⛽", desc: "Combustible, peajes y más" },
+    { id: "paradas", label: "Paradas", emoji: "📍", desc: "Consulta paradas de taxi" },
+    { id: "dashboard", label: "Panel", emoji: "📊", desc: "Resumen de tu actividad" },
+  ];
+  const activa = !!state.jornadaActivaId;
+  return `
+    <div class="p-4 space-y-4">
+      <div class="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-5 text-brand-900">
+        <p class="text-sm font-medium opacity-80">TaxiDiario</p>
+        <h1 class="text-2xl font-bold mt-1">${state.conductor ? "Hola, " + esc(state.conductor) : "Bienvenido"}</h1>
+        ${state.matricula ? `<p class="text-sm opacity-80 mt-0.5">Matrícula ${esc(state.matricula)}</p>` : ""}
+        <div class="mt-3 inline-flex items-center gap-2 rounded-full bg-black/10 px-3 py-1 text-xs font-semibold">
+          <span class="h-2 w-2 rounded-full ${activa ? "bg-green-600" : "bg-black/40"}"></span>
+          ${activa ? "Jornada activa" : "Sin jornada activa"}
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        ${CARDS.map((c) => `
+          <button data-go="${c.id}" class="text-left rounded-xl bg-neutral-900 border border-neutral-800 p-4 hover:border-brand-500 transition-colors">
+            <div class="text-2xl">${c.emoji}</div>
+            <div class="mt-2 font-semibold">${c.label}</div>
+            <div class="text-xs text-neutral-400 mt-0.5">${c.desc}</div>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderJornada() {
+  const activa = state.jornadas.find((j) => j.id === state.jornadaActivaId);
+  const historial = state.jornadas.filter((j) => j.endedAt);
+
+  let bloque;
+  if (activa) {
+    bloque = `
+      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+        <div class="text-sm text-neutral-400">Iniciada ${formatDateTime(activa.startedAt)}</div>
+        <div class="text-2xl font-bold" id="cronometro">${formatDuration((Date.now() - activa.startedAt) / 1000)}</div>
+        <input id="kmFin" placeholder="Km final (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <button id="btn-fin-jornada" class="w-full rounded-lg bg-red-600 hover:bg-red-500 py-2 font-semibold">Finalizar jornada</button>
+      </div>
+    `;
+  } else {
+    bloque = `
+      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+        <p class="text-sm text-neutral-400">No tienes ninguna jornada activa.</p>
+        <input id="kmInicio" placeholder="Km inicial (opcional)" inputmode="numeric" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <button id="btn-ini-jornada" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Iniciar jornada</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="p-4 space-y-4">
+      <h2 class="text-lg font-bold">Jornada</h2>
+      ${bloque}
+      <div>
+        <h3 class="text-sm font-semibold text-neutral-400 mb-2">Historial</h3>
+        <div class="space-y-2">
+          ${historial.length === 0
+            ? `<p class="text-sm text-neutral-500">Aún no hay jornadas finalizadas.</p>`
+            : historial.map((j) => `
+              <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between">
+                <div>
+                  <div class="font-medium">${formatDateTime(j.startedAt)}</div>
+                  <div class="text-neutral-500 text-xs">${j.kmInicio != null && j.kmFin != null ? (j.kmFin - j.kmInicio) + " km" : ""}</div>
+                </div>
+                <div class="text-neutral-400">${formatDuration(((j.endedAt ?? 0) - j.startedAt) / 1000)}</div>
+              </div>`).join("")
+          }
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderServicios() {
+  return `
+    <div class="p-4 space-y-4">
+      <h2 class="text-lg font-bold">Servicios</h2>
+      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <input id="srv-origen" placeholder="Origen" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <input id="srv-destino" placeholder="Destino" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <input id="srv-importe" placeholder="Importe €" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <input id="srv-propina" placeholder="Propina €" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <input id="srv-pax" placeholder="Pax" inputmode="numeric" value="1" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        </div>
+        <div class="flex gap-2" id="srv-pago-group">
+          ${["efectivo", "tarjeta", "app"].map((p, i) => `
+            <button data-pago="${p}" class="flex-1 rounded-lg py-2 text-sm font-medium border ${i === 0 ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}">${PAGO_LABEL[p]}</button>
+          `).join("")}
+        </div>
+        <button id="btn-add-srv" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Guardar servicio</button>
+      </div>
+      <div class="space-y-2">
+        ${state.services.length === 0
+          ? `<p class="text-sm text-neutral-500">Aún no hay servicios registrados.</p>`
+          : state.services.map((s) => `
+            <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between items-start">
+              <div>
+                <div class="font-medium">${esc(s.origen)} → ${esc(s.destino)}</div>
+                <div class="text-neutral-500 text-xs mt-0.5">${formatTime(s.at)} · ${PAGO_LABEL[s.pago]} · ${s.pasajeros} pax</div>
+              </div>
+              <div class="text-right">
+                <div class="font-semibold">${formatEuro(s.importe + s.propina)}</div>
+                <button data-del-srv="${s.id}" class="text-xs text-red-400 mt-1">Eliminar</button>
+              </div>
+            </div>`).join("")
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderGastos() {
+  return `
+    <div class="p-4 space-y-4">
+      <h2 class="text-lg font-bold">Gastos</h2>
+      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 space-y-3">
+        <div class="grid grid-cols-3 gap-2" id="gasto-tipo-group">
+          ${Object.keys(GASTO_LABEL).map((t, i) => `
+            <button data-gasto="${t}" class="rounded-lg py-2 text-xs font-medium border ${i === 0 ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}">${GASTO_LABEL[t]}</button>
+          `).join("")}
+        </div>
+        <input id="gasto-importe" placeholder="Importe €" inputmode="decimal" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <button id="btn-add-gasto" class="w-full rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Guardar gasto</button>
+      </div>
+      <div class="space-y-2">
+        ${state.gastos.length === 0
+          ? `<p class="text-sm text-neutral-500">Aún no hay gastos registrados.</p>`
+          : state.gastos.map((g) => `
+            <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3 text-sm flex justify-between items-center">
+              <div>
+                <div class="font-medium">${GASTO_LABEL[g.tipo]}</div>
+                <div class="text-neutral-500 text-xs">${formatTime(g.at)}</div>
+              </div>
+              <div class="text-right">
+                <div class="font-semibold">${formatEuro(g.importe)}</div>
+                <button data-del-gasto="${g.id}" class="text-xs text-red-400 mt-1">Eliminar</button>
+              </div>
+            </div>`).join("")
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderParadas() {
+  return `
+    <div class="p-4 space-y-4">
+      <h2 class="text-lg font-bold">Paradas</h2>
+      <input id="paradas-q" placeholder="Buscar parada, barrio..." class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+      <div class="space-y-2" id="paradas-lista"></div>
+      <p class="text-xs text-neutral-600">Lista de ejemplo — edítala en el array <code>PARADAS</code> dentro del propio HTML.</p>
+    </div>
+  `;
+}
+
+function renderDashboard() {
+  return `
+    <div class="p-4 space-y-4">
+      <h2 class="text-lg font-bold">Panel</h2>
+      <div class="flex gap-2" id="rango-group">
+        ${["hoy", "semana", "total"].map((r, i) => `
+          <button data-rango="${r}" class="flex-1 rounded-lg py-2 text-sm font-medium border capitalize ${i === 0 ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}">${r}</button>
+        `).join("")}
+      </div>
+      <div class="grid grid-cols-2 gap-3" id="panel-stats"></div>
+    </div>
+  `;
+}
+
+/* ===================== Listeners según vista ===================== */
+function bindViewEvents() {
+  // Home: tarjetas de navegación
+  root.querySelectorAll("[data-go]").forEach((btn) => {
+    btn.addEventListener("click", () => { state.view = btn.dataset.go; save(); render(); });
+  });
+
+  if (state.view === "jornada") {
+    const btnIni = document.getElementById("btn-ini-jornada");
+    if (btnIni) btnIni.addEventListener("click", () => {
+      const km = document.getElementById("kmInicio").value;
+      const j = { id: uid("jor"), startedAt: Date.now(), kmInicio: km ? Number(km) : undefined, notas: "" };
+      state.jornadas.unshift(j);
+      state.jornadaActivaId = j.id;
+      save(); render();
+    });
+    const btnFin = document.getElementById("btn-fin-jornada");
+    if (btnFin) btnFin.addEventListener("click", () => {
+      const km = document.getElementById("kmFin").value;
+      const id = state.jornadaActivaId;
+      if (!id) return;
+      state.jornadas = state.jornadas.map((j) => j.id === id
+        ? { ...j, endedAt: Date.now(), kmFin: km ? Number(km) : j.kmFin }
+        : j);
+      state.jornadaActivaId = null;
+      save(); render();
+    });
+  }
+
+  if (state.view === "servicios") {
+    let pagoSeleccionado = "efectivo";
+    root.querySelectorAll("#srv-pago-group [data-pago]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        pagoSeleccionado = btn.dataset.pago;
+        root.querySelectorAll("#srv-pago-group [data-pago]").forEach((b) => {
+          const active = b.dataset.pago === pagoSeleccionado;
+          b.className = `flex-1 rounded-lg py-2 text-sm font-medium border ${active ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
+        });
+      });
+    });
+    document.getElementById("btn-add-srv").addEventListener("click", () => {
+      const importe = Number(document.getElementById("srv-importe").value) || 0;
+      if (!importe) return;
+      const s = {
+        id: uid("srv"), at: Date.now(),
+        origen: document.getElementById("srv-origen").value.trim() || "—",
+        destino: document.getElementById("srv-destino").value.trim() || "—",
+        importe,
+        propina: Number(document.getElementById("srv-propina").value) || 0,
+        pago: pagoSeleccionado,
+        minutos: 0,
+        pasajeros: Number(document.getElementById("srv-pax").value) || 1,
+        notas: "",
+        jornadaId: state.jornadaActivaId || undefined,
+      };
+      state.services.unshift(s);
+      save(); render();
+    });
+    root.querySelectorAll("[data-del-srv]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.services = state.services.filter((s) => s.id !== btn.dataset.delSrv);
+        save(); render();
+      });
+    });
+  }
+
+  if (state.view === "gastos") {
+    let tipoSeleccionado = "combustible";
+    root.querySelectorAll("#gasto-tipo-group [data-gasto]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        tipoSeleccionado = btn.dataset.gasto;
+        root.querySelectorAll("#gasto-tipo-group [data-gasto]").forEach((b) => {
+          const active = b.dataset.gasto === tipoSeleccionado;
+          b.className = `rounded-lg py-2 text-xs font-medium border ${active ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
+        });
+      });
+    });
+    document.getElementById("btn-add-gasto").addEventListener("click", () => {
+      const importe = Number(document.getElementById("gasto-importe").value) || 0;
+      if (!importe) return;
+      state.gastos.unshift({
+        id: uid("gst"), at: Date.now(),
+        tipo: tipoSeleccionado, importe, notas: "",
+        jornadaId: state.jornadaActivaId || undefined,
+      });
+      save(); render();
+    });
+    root.querySelectorAll("[data-del-gasto]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.gastos = state.gastos.filter((g) => g.id !== btn.dataset.delGasto);
+        save(); render();
+      });
+    });
+  }
+
+  if (state.view === "paradas") {
+    const input = document.getElementById("paradas-q");
+    const lista = document.getElementById("paradas-lista");
+    const paint = (q = "") => {
+      const filtered = PARADAS.filter((p) =>
+        `${p.nombre} ${p.barrio} ${p.municipio}`.toLowerCase().includes(q.toLowerCase())
+      );
+      lista.innerHTML = filtered.length === 0
+        ? `<p class="text-sm text-neutral-500">Sin resultados.</p>`
+        : filtered.map((p) => `
+          <div class="rounded-lg bg-neutral-900 border border-neutral-800 p-3">
+            <div class="font-medium">${esc(p.nombre)}</div>
+            <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}</div>
+            <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
+          </div>`).join("");
+    };
+    paint();
+    input.addEventListener("input", () => paint(input.value));
+  }
+
+  if (state.view === "dashboard") {
+    let rango = "hoy";
+    const statsEl = document.getElementById("panel-stats");
+    const paint = () => {
+      const since = rango === "hoy" ? startOfDay() : rango === "semana" ? startOfWeek() : 0;
+      const svc = state.services.filter((s) => s.at >= since);
+      const gst = state.gastos.filter((g) => g.at >= since);
+      const ingresos = svc.reduce((sum, s) => sum + s.importe + s.propina, 0);
+      const gastosTotal = gst.reduce((sum, g) => sum + g.importe, 0);
+      const neto = ingresos - gastosTotal;
+      const media = svc.length ? ingresos / svc.length : 0;
+
+      const stat = (label, value, accent, full) => `
+        <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-4 ${full ? "col-span-2" : ""}">
+          <div class="text-xs text-neutral-500">${label}</div>
+          <div class="text-xl font-bold mt-1 ${accent ? "text-brand-500" : ""}">${value}</div>
+        </div>`;
+
+      statsEl.innerHTML =
+        stat("Ingresos", formatEuro(ingresos), true) +
+        stat("Gastos", formatEuro(gastosTotal)) +
+        stat("Neto", formatEuro(neto), true) +
+        stat("Servicios", String(svc.length)) +
+        stat("Media/servicio", formatEuro(media), false, true);
+    };
+    paint();
+    root.querySelectorAll("#rango-group [data-rango]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        rango = btn.dataset.rango;
+        root.querySelectorAll("#rango-group [data-rango]").forEach((b) => {
+          const active = b.dataset.rango === rango;
+          b.className = `flex-1 rounded-lg py-2 text-sm font-medium border capitalize ${active ? "bg-brand-500 text-brand-900 border-brand-500" : "bg-neutral-800 border-neutral-700 text-neutral-300"}`;
+        });
+        paint();
+      });
+    });
+  }
+}
+
+/* ===================== Cronómetro de jornada ===================== */
+setInterval(() => {
+  if (state.view === "jornada" && state.jornadaActivaId) {
+    const activa = state.jornadas.find((j) => j.id === state.jornadaActivaId);
+    const el = document.getElementById("cronometro");
+    if (activa && el) el.textContent = formatDuration((Date.now() - activa.startedAt) / 1000);
+  }
+}, 1000);
+
+/* ===================== Arranque ===================== */
+load();
+render();
+</script>
+</body>
 </html>
