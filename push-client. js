@@ -1,0 +1,149 @@
+/* ============================================================
+   TaxiDiario — Cliente Web Push
+   © 2026 TaxiDiario. Todos los derechos reservados.
+   ============================================================ */
+
+(function(){
+  const NTFY_BASE = "https://ntfy.sh";
+  const SW_URL = "/paradas/sw.js";
+
+  // ------------------------------------------------------------
+  // Registrar el Service Worker
+  // ------------------------------------------------------------
+  async function registrarSW() {
+    if (!("serviceWorker" in navigator)) {
+      console.warn("[Push] Service Worker no soportado");
+      return null;
+    }
+    try {
+      const reg = await navigator.serviceWorker.register(SW_URL, { scope: "/paradas/" });
+      console.log("[Push] SW registrado:", reg.scope);
+      return reg;
+    } catch (e) {
+      console.error("[Push] Error registrando SW:", e);
+      return null;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Convertir VAPID public key base64url → Uint8Array
+  // (ntfy usa su propia clave VAPID pública)
+  // ------------------------------------------------------------
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // ------------------------------------------------------------
+  // Obtener la VAPID public key de ntfy
+  // ntfy la expone en /v1/config o en el endpoint de suscripción
+  // ------------------------------------------------------------
+  async function obtenerVapidKey() {
+    // ntfy.sh público usa esta clave fija (basta para su servidor)
+    // Si usas self-hosted, cámbiala por la tuya
+    const VAPID_PUBLIC_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U";
+    return VAPID_PUBLIC_KEY;
+  }
+
+  // ------------------------------------------------------------
+  // Suscribir al push
+  // ------------------------------------------------------------
+  async function suscribirPush(topic) {
+    try {
+      // 1. Pedir permiso
+      const permiso = await Notification.requestPermission();
+      if (permiso !== "granted") {
+        console.warn("[Push] Permiso denegado");
+        return { ok: false, motivo: "denegado" };
+      }
+
+      // 2. Registrar SW
+      const reg = await registrarSW();
+      if (!reg) return { ok: false, motivo: "sin-sw" };
+
+      // 3. Esperar a que esté listo
+      await navigator.serviceWorker.ready;
+
+      // 4. Comprobar suscripción existente
+      let sub = await reg.pushManager.getSubscription();
+
+      if (!sub) {
+        // 5. Crear nueva suscripción con VAPID
+        const vapidKey = await obtenerVapidKey();
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+      }
+
+      console.log("[Push] Suscripción:", sub.endpoint);
+
+      // 6. Enviar la suscripción a ntfy para ese topic
+      await enviarSuscripcionANtfy(topic, sub);
+
+      return { ok: true, endpoint: sub.endpoint };
+    } catch (e) {
+      console.error("[Push] Error suscribiendo:", e);
+      return { ok: false, motivo: e.message };
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Enviar la suscripción al endpoint de ntfy
+  // ntfy espera un POST a <server>/<topic> con la suscripción
+  // ------------------------------------------------------------
+  async function enviarSuscripcionANtfy(topic, subscription) {
+    const payload = {
+      endpoint: subscription.endpoint,
+      keys: {
+        p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("p256dh")))),
+        auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("auth")))),
+      },
+    };
+
+    const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(topic)}/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`ntfy respondió ${res.status}: ${txt}`);
+    }
+    console.log("[Push] Suscripción enviada a ntfy para topic:", topic);
+  }
+
+  // ------------------------------------------------------------
+  // Desuscribir
+  // ------------------------------------------------------------
+  async function desuscribirPush() {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration("/paradas/");
+      if (!reg) return { ok: false };
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      return { ok: true };
+    } catch (e) {
+      console.error("[Push] Error desuscribiendo:", e);
+      return { ok: false, motivo: e.message };
+    }
+  }
+
+  // ------------------------------------------------------------
+  // API pública
+  // ------------------------------------------------------------
+  window.TaxiPush = {
+    suscribir: suscribirPush,
+    desuscribir: desuscribirPush,
+    registrarSW,
+    estaSoportado: () => "serviceWorker" in navigator && "PushManager" in window,
+    permisos: () => ("Notification" in window ? Notification.permission : "unsupported"),
+  };
+})();
