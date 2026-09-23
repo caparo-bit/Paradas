@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>TaxiDiario</title>
 <meta name="description" content="Controla tus jornadas, servicios, gastos y paradas de taxi" />
+<meta name="author" content="TaxiDiario © 2026 - Todos los derechos reservados" />
+<meta name="robots" content="noindex, nofollow" />
+<!--
+  ============================================================
+  © 2026 TaxiDiario. Todos los derechos reservados.
+  Software propietario. Prohibida su copia, redistribución,
+  modificación o uso distinto al autorizado expresamente.
+  Uso permitido únicamente en: caparo-bit.github.io
+  ============================================================
+-->
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -26,12 +36,106 @@
   .leaflet-control-attribution a { color:#bbb !important; }
   .leaflet-bar { border:none !important; }
   .leaflet-bar a { background:#1a1a1d !important; color:#f5b400 !important; border-bottom:1px solid #333 !important; }
+
+  #news-ticker {
+    position: fixed; left: 0; right: 0;
+    bottom: 62px;
+    max-width: 28rem; margin: 0 auto;
+    background: linear-gradient(90deg, #7c2d12, #b45309, #7c2d12);
+    color: #fff; overflow: hidden; white-space: nowrap;
+    height: 34px; line-height: 34px;
+    border-top: 1px solid #f5b400;
+    z-index: 400;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  #news-ticker .ticker-track {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%;
+    animation: ticker-scroll 28s linear infinite;
+  }
+  #news-ticker .ticker-track:hover { animation-play-state: paused; }
+  @keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  @keyframes fire-pulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(255,100,0,0.8)); }
+    50%      { transform: scale(1.18); filter: drop-shadow(0 0 12px rgba(255,80,0,1)); }
+  }
+  .fire-icon {
+    font-size: 30px;
+    animation: fire-pulse 1.1s ease-in-out infinite;
+    text-align: center;
+  }
+
+  #fab-hay-publico {
+    position: fixed;
+    right: 16px;
+    bottom: 110px;
+    z-index: 450;
+    border-radius: 9999px;
+    padding: 14px 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f59e0b, #dc2626);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0.7);
+    animation: fab-pulse 2s infinite;
+    display: flex; align-items: center; gap: 6px;
+  }
+  @keyframes fab-pulse {
+    0%   { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0.7); }
+    70%  { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 18px rgba(220,38,38,0); }
+    100% { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0); }
+  }
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script>
+/* ============================================================
+   © 2026 TaxiDiario — Todos los derechos reservados.
+   Prohibido su uso, copia, redistribución o modificación
+   sin autorización expresa del titular.
+   Autorizado únicamente en: caparo-bit.github.io
+   ============================================================ */
+
+/* ---------- Protección por dominio ---------- */
+(function(){
+  const DOMINIOS_AUTORIZADOS = ["caparo-bit.github.io", "localhost", "127.0.0.1"];
+  const host = location.hostname;
+  const ok = DOMINIOS_AUTORIZADOS.some(d => host === d || host.endsWith("." + d));
+  if (!ok) {
+    document.documentElement.innerHTML = `
+      <head><title>Acceso no autorizado</title></head>
+      <body style="margin:0;padding:40px;background:#0b0b0d;color:#f5f5f5;font-family:system-ui,sans-serif;text-align:center;min-height:100vh;">
+        <div style="max-width:420px;margin:80px auto;">
+          <div style="font-size:64px;">⛔</div>
+          <h1 style="color:#dc2626;margin:8px 0 16px;">Acceso no autorizado</h1>
+          <p style="color:#aaa;line-height:1.6;">
+            Esta aplicación está protegida y solo puede ejecutarse desde su dominio oficial.
+          </p>
+          <p style="color:#f5b400;font-weight:bold;font-size:18px;">caparo-bit.github.io</p>
+          <hr style="border:0;border-top:1px solid #333;margin:32px 0;">
+          <p style="color:#666;font-size:12px;line-height:1.6;">
+            © 2026 TaxiDiario · Todos los derechos reservados.<br>
+            El uso no autorizado de este software está terminantemente prohibido.
+          </p>
+        </div>
+      </body>`;
+    throw new Error("Dominio no autorizado");
+  }
+})();
+
+/* ---------- Anti-manipulación ligera ---------- */
+try {
+  Object.defineProperty(window, "__TAXI_APP__", { value:"TaxiDiario-©2026", writable:false, configurable:false });
+  Object.freeze(Object.prototype);
+} catch(e) {}
+
 /* ===================== Configuración ===================== */
 const RADIO_PREGUNTAR      = 150;
 const RADIO_TERMINAR       = 250;
@@ -40,10 +144,14 @@ const MOVIMIENTO_MAX_M     = 30;
 const MIN_DURACION_ESPERA  = 20;
 const RESET_SIN_VISITA_MS  = 30*60*1000;
 const NEARBY_RADIUS_M      = 10000;
+const HAY_PUBLICO_TTL_MIN      = 2*60*1000;
+const HAY_PUBLICO_TTL_MAX      = 10*60*1000;
+const HAY_PUBLICO_VENTANA_MS   = 5*60*1000;
+const HAY_PUBLICO_UMBRAL       = 5;
+const NTFY_BASE = "https://ntfy.sh";
 
 /* ===================== Catálogo de paradas ===================== */
 const PARADAS_CATALOGO = [
-  /* --- Madrid capital --- */
   { id:"m01", nombre:"Puerta del Sol", municipio:"Madrid", barrio:"Centro", plazas:6, horario:"24h", lat:40.4168, lng:-3.7038 },
   { id:"m02", nombre:"Estación de Atocha", municipio:"Madrid", barrio:"Arganzuela", plazas:12, horario:"24h", lat:40.4066, lng:-3.6906 },
   { id:"m03", nombre:"Aeropuerto T4", municipio:"Madrid", barrio:"Barajas", plazas:20, horario:"24h", lat:40.4936, lng:-3.5668 },
@@ -86,7 +194,6 @@ const PARADAS_CATALOGO = [
   { id:"m40", nombre:"Arturo Soria", municipio:"Madrid", barrio:"Ciudad Lineal", plazas:4, horario:"24h", lat:40.4500, lng:-3.6510 },
   { id:"m41", nombre:"Ciudad Lineal", municipio:"Madrid", barrio:"Ciudad Lineal", plazas:3, horario:"24h", lat:40.4400, lng:-3.6400 },
   { id:"m42", nombre:"Barajas Pueblo", municipio:"Madrid", barrio:"Barajas", plazas:4, horario:"24h", lat:40.4750, lng:-3.5800 },
-  /* --- Comunidad de Madrid --- */
   { id:"c01", nombre:"Estación de Alcobendas-S.S. Reyes", municipio:"Alcobendas", barrio:"Centro", plazas:10, horario:"24h", lat:40.5408, lng:-3.6354 },
   { id:"c02", nombre:"Hospital de Getafe", municipio:"Getafe", barrio:"Centro", plazas:8, horario:"24h", lat:40.3067, lng:-3.7333 },
   { id:"c03", nombre:"Estación de Leganés Central", municipio:"Leganés", barrio:"Centro", plazas:10, horario:"24h", lat:40.3283, lng:-3.7638 },
@@ -95,7 +202,7 @@ const PARADAS_CATALOGO = [
   { id:"c06", nombre:"Estación de Alcorcón", municipio:"Alcorcón", barrio:"Centro", plazas:7, horario:"24h", lat:40.3450, lng:-3.8250 },
   { id:"c07", nombre:"Estación de Fuenlabrada Central", municipio:"Fuenlabrada", barrio:"Centro", plazas:8, horario:"24h", lat:40.2840, lng:-3.7940 },
   { id:"c08", nombre:"Avenida de España", municipio:"Las Rozas", barrio:"Centro", plazas:5, horario:"24h", lat:40.4921, lng:-3.8736 },
-  { id:"c09", nombre:"Estación de Pozuelo", municipio:"Pozuelo de Alarcón", barrio:"Centro", plazas:6, horario:"24h", lat:40.4348, lng:-3.8142 },
+  { id:"c09", nombre:"Estación de Pozuelo", municipio:"Pozuelo de Alarcón", barrio:"Centro", plazas:6, horario:"24h", lat:40.4148, lng:-3.8142 },
   { id:"c10", nombre:"Estación de Majadahonda", municipio:"Majadahonda", barrio:"Centro", plazas:7, horario:"24h", lat:40.4730, lng:-3.8730 },
   { id:"c11", nombre:"Estación de Boadilla", municipio:"Boadilla del Monte", barrio:"Centro", plazas:5, horario:"24h", lat:40.4060, lng:-3.8780 },
   { id:"c12", nombre:"Torrejón de Ardoz Centro", municipio:"Torrejón de Ardoz", barrio:"Centro", plazas:6, horario:"24h", lat:40.4590, lng:-3.4790 },
@@ -114,13 +221,15 @@ const PARADAS_CATALOGO = [
 ];
 
 /* ===================== Estado ===================== */
-const STORAGE_KEY = "taxidiario-v5";
+const STORAGE_KEY = "taxidiario-v6";
 const state = {
   view:"home", conductor:"", matricula:"",
   services:[], gastos:[], jornadas:[], jornadaActivaId:null,
   waitRecords:{}, activeWait:null,
   paradasUsuario:[],
   expandedJornadaId:null,
+  canalPublico:"taxidiario-x7k9m2p4q8w3v6n1",  // canal privado por defecto
+  hayPublico:[],
 };
 
 function load() {
@@ -128,6 +237,7 @@ function load() {
   if (state.activeWait) {
     proximityState[state.activeWait.paradaId] = { status:"waiting", startTime: state.activeWait.startTime, lastSeen: Date.now() };
   }
+  if (!state.hayPublico) state.hayPublico = [];
 }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
 function uid(p){ return `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`; }
@@ -163,6 +273,148 @@ const proximityState = {};
 const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
 const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
 
+/* ===================== Hay Público (ntfy.sh) ===================== */
+let sseConnection = null;
+let fireMarkers = [];
+
+function getCanal() { return (state.canalPublico || "taxidiario-x7k9m2p4q8w3v6n1").trim(); }
+
+function notificarHayPublico() {
+  if (!lastPosition) { showToast("⚠️ Necesito tu ubicación GPS"); return; }
+
+  const cercanas = getAllParadas()
+    .map(p => ({ p, d: distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) }))
+    .sort((a,b) => a.d - b.d);
+  const parada = cercanas[0] && cercanas[0].d < 300 ? cercanas[0].p : null;
+
+  const msg = {
+    type: "hayPublico",
+    id: uid("hp"),
+    lat: lastPosition.lat,
+    lng: lastPosition.lng,
+    paradaId: parada?.id || null,
+    paradaNombre: parada?.nombre || null,
+    usuario: state.conductor || "Taxi",
+    ts: Date.now(),
+  };
+
+  addHayPublico(msg);
+
+  fetch(`${NTFY_BASE}/${encodeURIComponent(getCanal())}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Title": "Hay público", "Priority": "high", "Tags": "fire" },
+    body: JSON.stringify(msg),
+  }).then(() => {
+    showToast(`🔥 Aviso enviado${parada ? " en " + parada.nombre : ""}`);
+  }).catch(() => {
+    showToast("⚠️ No se pudo enviar (revisa conexión)");
+  });
+}
+
+function addHayPublico(msg) {
+  if (!state.hayPublico) state.hayPublico = [];
+  if (state.hayPublico.find(a => a.id === msg.id)) return;
+  state.hayPublico.push(msg);
+  limpiarHayPublico();
+  save();
+  updateFireMarkers();
+  updateTicker();
+}
+
+function limpiarHayPublico() {
+  const now = Date.now();
+  if (!state.hayPublico) state.hayPublico = [];
+
+  const grupos = {};
+  state.hayPublico.forEach(a => {
+    const key = a.paradaId || `${a.lat.toFixed(3)}_${a.lng.toFixed(3)}`;
+    (grupos[key] = grupos[key] || []).push(a);
+  });
+
+  const expirados = new Set();
+  Object.values(grupos).forEach(items => {
+    const recientes = items.filter(a => now - a.ts < HAY_PUBLICO_VENTANA_MS);
+    const ttl = recientes.length >= HAY_PUBLICO_UMBRAL ? HAY_PUBLICO_TTL_MAX : HAY_PUBLICO_TTL_MIN;
+    items.forEach(a => { if (now - a.ts > ttl) expirados.add(a.id); });
+  });
+
+  const antes = state.hayPublico.length;
+  state.hayPublico = state.hayPublico.filter(a => !expirados.has(a.id));
+  return antes !== state.hayPublico.length;
+}
+
+function updateFireMarkers() {
+  if (!map) return;
+  fireMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
+  fireMarkers = [];
+
+  const now = Date.now();
+  state.hayPublico.forEach(a => {
+    const icon = L.divIcon({
+      className: "",
+      html: `<div class="fire-icon">🔥</div>`,
+      iconSize: [30,30], iconAnchor: [15,30],
+    });
+    const edad = Math.round((now - a.ts) / 1000);
+    const marcador = L.marker([a.lat, a.lng], { icon, zIndexOffset: 500 }).addTo(map);
+    marcador.bindPopup(`<div style="color:#111"><b>🔥 Hay público</b><br>${a.paradaNombre ? a.paradaNombre+"<br>" : ""}Hace ${edad}s${a.usuario ? " · "+esc(a.usuario) : ""}</div>`);
+    fireMarkers.push(marcador);
+  });
+}
+
+function updateTicker() {
+  const el = document.getElementById("news-ticker");
+  if (!el) return;
+  if (!state.hayPublico || state.hayPublico.length === 0) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  const sorted = [...state.hayPublico].sort((a,b) => b.ts - a.ts);
+  const now = Date.now();
+  const items = sorted.map(a => {
+    const edad = Math.max(0, Math.round((now - a.ts) / 1000));
+    const nombre = a.paradaNombre || "zona";
+    const mins = edad < 60 ? `${edad}s` : `${Math.floor(edad/60)}m`;
+    return `🔥 HAY PÚBLICO en ${nombre} (hace ${mins})`;
+  });
+  el.classList.remove("hidden");
+  el.innerHTML = `<div class="ticker-track">${items.join("     •     ")}</div>`;
+}
+
+async function suscribirHayPublico() {
+  try {
+    const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(getCanal())}/json?poll=1&since=30m`);
+    const texto = await res.text();
+    texto.trim().split("\n").filter(Boolean).forEach(line => {
+      try {
+        const data = JSON.parse(line);
+        if (data.event === "message" && data.message) {
+          const payload = JSON.parse(data.message);
+          if (payload.type === "hayPublico") addHayPublico(payload);
+        }
+      } catch(e){}
+    });
+  } catch(e) { console.warn("No se pudieron cargar avisos recientes:", e); }
+
+  if (sseConnection) { try { sseConnection.close(); } catch(e){} sseConnection = null; }
+  try {
+    sseConnection = new EventSource(`${NTFY_BASE}/${encodeURIComponent(getCanal())}/sse`);
+    sseConnection.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.event === "message" && data.message) {
+          const payload = JSON.parse(data.message);
+          if (payload.type === "hayPublico") addHayPublico(payload);
+        }
+      } catch(err) {}
+    };
+    sseConnection.onerror = () => {};
+  } catch(e) {
+    console.warn("SSE no disponible:", e);
+  }
+}
+
 /* ===================== Render raíz ===================== */
 const root = document.getElementById("root");
 let map = null, userMarker = null, userCircle = null;
@@ -181,13 +433,19 @@ function render() {
 
   if (map) { try { map.remove(); } catch(e){} map = null; }
   paradaMarkers = {}; userMarker = null; userCircle = null;
+  fireMarkers = [];
   destroyCharts();
 
   root.innerHTML = `
     <div class="min-h-screen flex flex-col max-w-md mx-auto relative">
       <div id="waiting-banner" class="hidden"></div>
       <main class="flex-1 pb-20 overflow-y-auto" id="main-view"></main>
-      <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-6">
+
+      <button id="fab-hay-publico" title="Avisar de que hay público">🔥 Hay público</button>
+
+      <div id="news-ticker" class="hidden"></div>
+
+      <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-6 z-[500]">
         ${[
           { id:"home", label:"Inicio", emoji:"🏠" },
           { id:"jornada", label:"Jornada", emoji:"🕒" },
@@ -204,8 +462,10 @@ function render() {
   `;
   document.getElementById("main-view").innerHTML = renderView();
   root.querySelectorAll("[data-nav]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.nav; save(); render(); }));
+  document.getElementById("fab-hay-publico").addEventListener("click", () => notificarHayPublico());
   bindViewEvents();
   updateWaitingBanner();
+  updateTicker();
 
   if (state.view === "paradas") requestAnimationFrame(() => { initMap(); });
   if (state.view === "jornada") requestAnimationFrame(() => { initJornadaCharts(); });
@@ -232,6 +492,20 @@ function renderHome() {
           ${activa ? "Jornada activa" : "Sin jornada activa"}
         </div>
       </div>
+
+      <div class="rounded-xl bg-neutral-900 border border-neutral-800 p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-xs text-neutral-400 font-semibold">📡 Canal de avisos "Hay público"</div>
+          <span class="text-[10px] text-green-500">${sseConnection ? "● en vivo" : "○ sin conexión"}</span>
+        </div>
+        <div class="flex gap-2">
+          <input id="canal-input" value="${esc(state.canalPublico||"")}" placeholder="nombre-del-canal"
+            class="flex-1 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <button id="canal-save" class="rounded-lg bg-brand-500 text-brand-900 px-3 text-sm font-semibold">Guardar</button>
+        </div>
+        <p class="text-[11px] text-neutral-500">Todos los taxis que usen el mismo canal reciben los avisos al instante. Cambia el nombre solo si quieres un grupo privado distinto.</p>
+      </div>
+
       <div class="grid grid-cols-2 gap-3">
         ${CARDS.map(c => `
           <button data-go="${c.id}" class="text-left rounded-xl bg-neutral-900 border border-neutral-800 p-4 hover:border-brand-500 transition-colors">
@@ -240,6 +514,11 @@ function renderHome() {
             <div class="text-xs text-neutral-400 mt-0.5">${c.desc}</div>
           </button>`).join("")}
       </div>
+
+      <p class="text-[10px] text-neutral-700 text-center pt-2 leading-relaxed">
+        © 2026 TaxiDiario · Todos los derechos reservados<br>
+        Software propietario. Uso exclusivo autorizado.
+      </p>
     </div>`;
 }
 
@@ -560,6 +839,18 @@ function renderDashboard() {
 function bindViewEvents() {
   root.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.go; save(); render(); }));
 
+  if (state.view === "home") {
+    const btn = document.getElementById("canal-save");
+    if (btn) btn.addEventListener("click", () => {
+      const nuevo = document.getElementById("canal-input").value.trim();
+      if (!nuevo) { showToast("Pon un nombre de canal"); return; }
+      state.canalPublico = nuevo;
+      save();
+      showToast(`📡 Canal: ${nuevo}`);
+      suscribirHayPublico();
+    });
+  }
+
   if (state.view === "jornada") {
     const ini = document.getElementById("btn-ini-jornada");
     if (ini) ini.addEventListener("click", () => {
@@ -656,6 +947,7 @@ function bindViewEvents() {
           const st = proximityState[p.id];
           const activo = st && st.status === "waiting";
           const propia = state.paradasUsuario.some(x => x.id === p.id);
+          const fuegosAqui = state.hayPublico.filter(a => a.paradaId === p.id).length;
           return `
             <div class="rounded-lg bg-neutral-900 border ${activo?"border-brand-500":"border-neutral-800"} p-3">
               <div class="flex justify-between items-start gap-2">
@@ -663,6 +955,7 @@ function bindViewEvents() {
                   <div class="font-medium flex items-center gap-2 flex-wrap">
                     ${activo?"⏱️ ":""}${esc(p.nombre)}
                     ${propia?`<span class="text-[10px] rounded-full bg-brand-500/20 text-brand-500 px-2 py-0.5">tuya</span>`:""}
+                    ${fuegosAqui>0?`<span class="text-[10px] rounded-full bg-red-500/20 text-red-400 px-2 py-0.5">🔥 ${fuegosAqui}</span>`:""}
                   </div>
                   <div class="text-xs text-neutral-500 mt-0.5">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist < 1000 ? Math.round(dist)+" m" : (dist/1000).toFixed(1)+" km"}`:""}</div>
                   <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
@@ -801,6 +1094,7 @@ function initMap() {
   if (!el) return;
   if (map) { try { map.remove(); } catch(e){} map = null; }
   paradaMarkers = {}; userMarker = null; userCircle = null;
+  fireMarkers = [];
 
   const center = lastPosition ? [lastPosition.lat, lastPosition.lng] : [40.4168, -3.7038];
   try {
@@ -830,6 +1124,7 @@ function initMap() {
   });
 
   if (lastPosition) drawUser(lastPosition.lat, lastPosition.lng);
+  updateFireMarkers();
   initGeolocation();
 }
 
@@ -1078,12 +1373,20 @@ setInterval(() => {
     }
   });
   if (changed) { save(); if (state.view === "paradas") renderParadaStats(); }
+
+  if (Math.floor(now/1000) % 5 === 0) {
+    const huboCambios = limpiarHayPublico();
+    if (huboCambios) save();
+    if (state.view === "paradas" && map) updateFireMarkers();
+    updateTicker();
+  }
 }, 1000);
 
 /* ===================== Arranque ===================== */
 load();
 render();
 initGeolocation();
+suscribirHayPublico();
 </script>
 </body>
 </html>
