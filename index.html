@@ -30,12 +30,33 @@
   ::-webkit-scrollbar { width:6px; height:6px; }
   ::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
   input, button, select { font-family: inherit; }
-  #map { height: 55vh; min-height: 320px; width: 100%; background:#1a1a1d; z-index:0; }
-  .leaflet-container { background:#1a1a1d; }
-  .leaflet-control-attribution { background: rgba(0,0,0,0.5) !important; color:#999 !important; font-size:10px !important; }
-  .leaflet-control-attribution a { color:#bbb !important; }
-  .leaflet-bar { border:none !important; }
-  .leaflet-bar a { background:#1a1a1d !important; color:#f5b400 !important; border-bottom:1px solid #333 !important; }
+  #map { height: 55vh; min-height: 320px; width: 100%; background:#e5e3df; z-index:0; }
+  .leaflet-container { background:#e5e3df; font-family: inherit; }
+  .leaflet-control-attribution {
+    background: rgba(255,255,255,0.85) !important;
+    color:#333 !important; font-size:10px !important;
+  }
+  .leaflet-control-attribution a { color:#1a73e8 !important; }
+  .leaflet-bar {
+    border:none !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+  }
+  .leaflet-bar a {
+    background:#fff !important; color:#666 !important;
+    border-bottom:1px solid #e6e6e6 !important;
+    width: 34px !important; height: 34px !important;
+    line-height: 34px !important; font-size: 18px !important;
+  }
+  .leaflet-bar a:hover { background:#f2f2f2 !important; color:#000 !important; }
+  .leaflet-bar a:last-child { border-bottom:none !important; }
+  .leaflet-popup-content-wrapper {
+    background:#fff; color:#111; border-radius:8px;
+    box-shadow:0 3px 14px rgba(0,0,0,0.25);
+  }
+  .leaflet-popup-tip { background:#fff; }
+  .leaflet-popup-content { margin: 10px 12px; font-size: 13px; }
 
   #news-ticker {
     position: fixed; left: 0; right: 0;
@@ -252,7 +273,7 @@ const state = {
   expandedJornadaId:null,
   hayPublico:[],
   sonidoActivo: true,
-  ultimoAviso: {}, // { paradaKey: ts } para anti-spam
+  ultimoAviso: {},
 };
 
 function load() {
@@ -346,7 +367,6 @@ function calcularClusters() {
   Object.values(grupos).forEach(g => {
     g.centroid.lat = g.paradas.reduce((s,p)=>s+p.lat,0) / g.paradas.length;
     g.centroid.lng = g.paradas.reduce((s,p)=>s+p.lng,0) / g.paradas.length;
-    // Nombre: municipio/barrio más frecuente
     const munis = {}, barrios = {};
     g.paradas.forEach(p => {
       munis[p.municipio] = (munis[p.municipio]||0) + 1;
@@ -383,7 +403,7 @@ function getClustersCercanos(n) {
 }
 
 /* ===================== Suscripciones SSE ===================== */
-const suscripciones = {}; // { clusterId: EventSource }
+const suscripciones = {};
 
 function gestionarSuscripciones() {
   if (!lastPosition || CLUSTERS.length === 0) return;
@@ -407,7 +427,6 @@ function gestionarSuscripciones() {
 
 async function suscribirCluster(cluster) {
   const canal = cluster.canal;
-  // Cargar últimos avisos (15 min)
   try {
     const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(canal)}/json?poll=1&since=15m`);
     const texto = await res.text();
@@ -497,7 +516,6 @@ function notificarHayPublico() {
     .sort((a,b) => a.d - b.d);
   const parada = cercanas[0] && cercanas[0].d < 300 ? cercanas[0].p : null;
 
-  // Anti-spam: dedup por parada
   const clave = parada?.id || `${lastPosition.lat.toFixed(3)}_${lastPosition.lng.toFixed(3)}`;
   const ultimo = state.ultimoAviso[clave] || 0;
   const ahora = Date.now();
@@ -507,7 +525,6 @@ function notificarHayPublico() {
     return;
   }
 
-  // Dedup: si ya hay aviso activo en esa parada en últimos 5 min, ignorar
   if (parada) {
     const reciente = state.hayPublico.find(a =>
       a.paradaId === parada.id && (ahora - a.ts) < MISMA_PARADA_DEDUP_MS
@@ -581,7 +598,6 @@ function updateFireMarkers() {
   fireMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
   fireMarkers = [];
 
-  // Agrupar por parada o por celda de ~100 m
   const grupos = {};
   state.hayPublico.forEach(a => {
     const key = a.paradaId || `${a.lat.toFixed(3)}_${a.lng.toFixed(3)}`;
@@ -1294,9 +1310,12 @@ function initMap() {
   try {
     map = L.map("map", { zoomControl:true }).setView(center, lastPosition ? 14 : 11);
   } catch(e) { console.error("Error creando mapa:", e); return; }
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: "abcd", maxZoom: 20,
+
+  // Teselas estilo Google Maps (roadmap estándar)
+  L.tileLayer("https://{s}.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}", {
+    attribution: 'Map data &copy; Google',
+    subdomains: ["mt0","mt1","mt2","mt3"],
+    maxZoom: 21,
   }).addTo(map);
 
   setTimeout(() => { if (map) map.invalidateSize(); }, 150);
@@ -1353,12 +1372,15 @@ function drawUser(lat, lng) {
   if (!map) return;
   const userIcon = L.divIcon({
     className:"",
-    html:`<div style="background:#3b82f6;border:3px solid white;width:18px;height:18px;border-radius:50%;box-shadow:0 0 0 8px rgba(59,130,246,0.25)"></div>`,
-    iconSize:[18,18], iconAnchor:[9,9],
+    html:`<div style="position:relative;width:22px;height:22px;">
+      <div style="position:absolute;inset:0;background:rgba(66,133,244,0.18);border-radius:50%;"></div>
+      <div style="position:absolute;left:5px;top:5px;width:12px;height:12px;background:#4285f4;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.35);"></div>
+    </div>`,
+    iconSize:[22,22], iconAnchor:[11,11],
   });
   if (!userMarker) userMarker = L.marker([lat,lng], { icon: userIcon }).addTo(map);
   else userMarker.setLatLng([lat,lng]);
-  if (!userCircle) userCircle = L.circle([lat,lng], { radius: RADIO_PREGUNTAR, color:"#3b82f6", weight:1, fillColor:"#3b82f6", fillOpacity:0.08 }).addTo(map);
+  if (!userCircle) userCircle = L.circle([lat,lng], { radius: RADIO_PREGUNTAR, color:"#4285f4", weight:1, fillColor:"#4285f4", fillOpacity:0.08 }).addTo(map);
   else userCircle.setLatLng([lat,lng]);
 }
 
@@ -1392,7 +1414,6 @@ function onPosition(pos) {
   checkAllParadas(lat, lng);
   updateWaitingBanner();
 
-  // Gestión de suscripciones a clusters
   const clusterActual = getClusterActual();
   const cambioCluster = clusterActual && clusterActual.id !== ultimoClusterId;
   if (cambioCluster || first) {
