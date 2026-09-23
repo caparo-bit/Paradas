@@ -31,30 +31,15 @@
   ::-webkit-scrollbar-thumb { background:#333; border-radius:4px; }
   input, button, select { font-family: inherit; }
   #map { height: 55vh; min-height: 320px; width: 100%; background:#e5e3df; z-index:0; }
+  #np-map { height: 200px; width: 100%; border-radius: 10px; overflow: hidden; border:1px solid #333; }
   .leaflet-container { background:#e5e3df; font-family: inherit; }
-  .leaflet-control-attribution {
-    background: rgba(255,255,255,0.85) !important;
-    color:#333 !important; font-size:10px !important;
-  }
+  .leaflet-control-attribution { background: rgba(255,255,255,0.85) !important; color:#333 !important; font-size:10px !important; }
   .leaflet-control-attribution a { color:#1a73e8 !important; }
-  .leaflet-bar {
-    border:none !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-    border-radius: 8px !important;
-    overflow: hidden;
-  }
-  .leaflet-bar a {
-    background:#fff !important; color:#666 !important;
-    border-bottom:1px solid #e6e6e6 !important;
-    width: 34px !important; height: 34px !important;
-    line-height: 34px !important; font-size: 18px !important;
-  }
+  .leaflet-bar { border:none !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important; border-radius: 8px !important; overflow: hidden; }
+  .leaflet-bar a { background:#fff !important; color:#666 !important; border-bottom:1px solid #e6e6e6 !important; width: 34px !important; height: 34px !important; line-height: 34px !important; font-size: 18px !important; }
   .leaflet-bar a:hover { background:#f2f2f2 !important; color:#000 !important; }
   .leaflet-bar a:last-child { border-bottom:none !important; }
-  .leaflet-popup-content-wrapper {
-    background:#fff; color:#111; border-radius:8px;
-    box-shadow:0 3px 14px rgba(0,0,0,0.25);
-  }
+  .leaflet-popup-content-wrapper { background:#fff; color:#111; border-radius:8px; box-shadow:0 3px 14px rgba(0,0,0,0.25); }
   .leaflet-popup-tip { background:#fff; }
   .leaflet-popup-content { margin: 10px 12px; font-size: 13px; }
 
@@ -62,73 +47,52 @@
   [data-parada-card]:hover { border-color:#f5b400; }
   [data-parada-card]:active { transform: scale(0.995); }
 
+  .progress-bar { height: 6px; background: #1f1f22; border-radius: 999px; overflow: hidden; }
+  .progress-bar > div { height: 100%; background: linear-gradient(90deg,#f59e0b,#f5b400); transition: width .4s; }
+
   #news-ticker {
-    position: fixed; left: 0; right: 0;
-    bottom: 62px;
-    max-width: 28rem; margin: 0 auto;
+    position: fixed; left: 0; right: 0; bottom: 62px; max-width: 28rem; margin: 0 auto;
     background: linear-gradient(90deg, #7c2d12, #b45309, #7c2d12);
     color: #fff; overflow: hidden; white-space: nowrap;
-    height: 34px; line-height: 34px;
-    border-top: 1px solid #f5b400;
-    z-index: 400;
-    font-size: 12px;
-    font-weight: 600;
+    height: 34px; line-height: 34px; border-top: 1px solid #f5b400;
+    z-index: 400; font-size: 12px; font-weight: 600;
   }
-  #news-ticker .ticker-track {
-    display: inline-block;
-    white-space: nowrap;
-    padding-left: 100%;
-    animation: ticker-scroll 28s linear infinite;
-  }
-  @keyframes ticker-scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-100%); }
-  }
+  #news-ticker .ticker-track { display: inline-block; white-space: nowrap; padding-left: 100%; animation: ticker-scroll 28s linear infinite; }
+  @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 
   @keyframes fire-pulse {
     0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(255,100,0,0.8)); }
     50%      { transform: scale(1.18); filter: drop-shadow(0 0 12px rgba(255,80,0,1)); }
   }
-  .fire-icon {
-    position: relative;
-    font-size: 30px;
-    animation: fire-pulse 1.1s ease-in-out infinite;
-    text-align: center;
-    line-height: 30px;
-  }
-  .fire-count {
-    position: absolute;
-    top: -6px; right: -10px;
-    background: #dc2626;
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 9999px;
-    border: 1.5px solid #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  }
+  .fire-icon { position: relative; font-size: 30px; animation: fire-pulse 1.1s ease-in-out infinite; text-align: center; line-height: 30px; }
+  .fire-count { position: absolute; top: -6px; right: -10px; background: #dc2626; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
 
   #fab-hay-publico {
-    position: fixed;
-    right: 16px;
-    bottom: 110px;
-    z-index: 450;
+    position: fixed; right: 12px; bottom: 74px; z-index: 450;
     border-radius: 9999px;
-    padding: 14px 20px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #f59e0b, #dc2626);
-    color: #fff;
-    box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0.7);
+    padding: 8px 14px; font-weight: 700; font-size: 13px; line-height: 1;
+    background: linear-gradient(135deg, #f59e0b, #dc2626); color: #fff;
+    box-shadow: 0 4px 14px rgba(220,38,38,0.45), 0 0 0 0 rgba(220,38,38,0.7);
     animation: fab-pulse 2s infinite;
-    display: flex; align-items: center; gap: 6px;
-    border: none;
+    display: flex; align-items: center; gap: 5px; border: none;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: grab;
   }
+  #fab-hay-publico.dragging { cursor: grabbing; animation: none; opacity: .92; }
   #fab-hay-publico:disabled { opacity: .55; animation: none; }
   @keyframes fab-pulse {
-    0%   { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0.7); }
-    70%  { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 18px rgba(220,38,38,0); }
-    100% { box-shadow: 0 8px 24px rgba(220,38,38,0.5), 0 0 0 0 rgba(220,38,38,0); }
+    0%   { box-shadow: 0 4px 14px rgba(220,38,38,0.45), 0 0 0 0 rgba(220,38,38,0.7); }
+    70%  { box-shadow: 0 4px 14px rgba(220,38,38,0.45), 0 0 0 12px rgba(220,38,38,0); }
+    100% { box-shadow: 0 4px 14px rgba(220,38,38,0.45), 0 0 0 0 rgba(220,38,38,0); }
+  }
+
+  #net-badge {
+    position: fixed; top: 8px; right: 8px; z-index: 9998;
+    background: #dc2626; color:#fff; font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 9999px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   }
 </style>
 </head>
@@ -143,7 +107,6 @@
    Autorizado únicamente en: caparo-bit.github.io
    ============================================================ */
 
-/* ---------- Protección por dominio ---------- */
 (function(){
   const DOMINIOS_AUTORIZADOS = ["caparo-bit.github.io", "localhost", "127.0.0.1"];
   const host = location.hostname;
@@ -180,28 +143,45 @@ const HAY_PUBLICO_VENTANA_MS   = 5*60*1000;
 const HAY_PUBLICO_UMBRAL       = 5;
 const NTFY_BASE = "https://ntfy.sh";
 
+/* ---------- Paradas comunitarias ---------- */
+const PARADA_VIDA_MS      = 24 * 60 * 60 * 1000;
+const PARADA_MIN_VERIF    = 5;
+const PARADA_MIN_EXTENDER = 2;
+const PARADA_RADIO_VERIF_M = 300;
+
 /* ---------- Clusters ---------- */
 const CENTRO_RADIO_M = 4000;
 const SOL_LAT = 40.4168, SOL_LNG = -3.7038;
 const UMBRAL_CENTRO = 1000;
 const UMBRAL_FUERA  = 5000;
 const UMBRAL_MIXTO  = 2500;
-const CLUSTERS_VECINOS = 3;
+const CLUSTERS_VECINOS = 2;
 const FILTRO_RADIO_AVISO_M = 3000;
 
-/* ---------- Canales (privados, con hash determinista) ---------- */
+/* ---------- Canales ---------- */
 const SEED_CANAL = "txd-2026-caparo-bit-paradas-cambia-esta-semilla-por-algo-unico-tuyo-a8f3e1b9c2d4";
 const PREFIJO_CANAL = "txd-cl-";
+const CANAL_GLOBAL = "txd-global-paradas-2026";
 
 /* ---------- Anti-spam ---------- */
 const MISMA_PARADA_MS  = 60*1000;
 const MISMA_PARADA_DEDUP_MS = 5*60*1000;
 
+/* ---------- Optimización de red ---------- */
+const RATE_LIMIT_VENTANA_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX = 5;
+const BATCH_VERIF_MS = 5000;
+const MAX_INTENTOS_COLA = 5;
+
+/* ---------- FAB arrastrable ---------- */
+const FAB_DRAG_THRESHOLD_PX = 8;  // si el dedo se mueve menos, cuenta como click
+const FAB_MARGIN_PX = 6;          // separación mínima con los bordes
+
 /* ===================== Catálogo de paradas ===================== */
 const PARADAS_CATALOGO = [
   { id:"m01", nombre:"Puerta del Sol", municipio:"Madrid", barrio:"Centro", plazas:6, horario:"24h", lat:40.4168, lng:-3.7038 },
   { id:"m02", nombre:"Estación de Atocha", municipio:"Madrid", barrio:"Arganzuela", plazas:12, horario:"24h", lat:40.4066, lng:-3.6906 },
-  { id:"m03", nombre:"Aeropuerto T4", municipio:"Madrid", barrio:"Barajas", plazas:20, horario:"24h", lat:40.4936, lng:-3.5668 },
+  { id:"m03", nombre:"Aeropuerto T4", municipio:"Madrid", barrio:"Barajas", plazas:20, horario:"24h", lat:40.4917, lng:-3.5731 },
   { id:"m04", nombre:"Aeropuerto T1", municipio:"Madrid", barrio:"Barajas", plazas:14, horario:"24h", lat:40.4727, lng:-3.5610 },
   { id:"m05", nombre:"Aeropuerto T2", municipio:"Madrid", barrio:"Barajas", plazas:12, horario:"24h", lat:40.4697, lng:-3.5705 },
   { id:"m06", nombre:"Plaza de España", municipio:"Madrid", barrio:"Moncloa-Aravaca", plazas:5, horario:"24h", lat:40.4239, lng:-3.7123 },
@@ -268,21 +248,34 @@ const PARADAS_CATALOGO = [
 ];
 
 /* ===================== Estado ===================== */
-const STORAGE_KEY = "taxidiario-v8";
+const STORAGE_KEY = "taxidiario-v10";
 const state = {
   view:"home", conductor:"", matricula:"",
   services:[], gastos:[], jornadas:[], jornadaActivaId:null,
   waitRecords:{}, activeWait:null,
   paradasUsuario:[],
+  paradasOverrides:{},
   expandedJornadaId:null,
   hayPublico:[],
   sonidoActivo: true,
   ultimoAviso: {},
-  frecuencia: {},              // { [paradaId]: { total, ultimoTs } } — histórico persistente
-  paradaSeleccionadaId: null,  // parada resaltada en el mapa / lista
+  frecuencia: {},
+  paradaSeleccionadaId: null,
+  taxistaId: "",
+  historialPublicaciones: [],
+  colaPublicacion: [],
+  fabPos: null,                 // { left, top } | null
 };
 
 function load() {
+  try {
+    const cur = localStorage.getItem(STORAGE_KEY);
+    if (!cur) {
+      const old = localStorage.getItem("taxidiario-v9") || localStorage.getItem("taxidiario-v8");
+      if (old) { try { localStorage.setItem(STORAGE_KEY, old); } catch(e){} }
+    }
+  } catch(e){}
+
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) Object.assign(state, JSON.parse(raw)); } catch(e){}
   if (state.activeWait) {
     proximityState[state.activeWait.paradaId] = { status:"waiting", startTime: state.activeWait.startTime, lastSeen: Date.now() };
@@ -290,12 +283,35 @@ function load() {
   if (!state.hayPublico) state.hayPublico = [];
   if (!state.ultimoAviso) state.ultimoAviso = {};
   if (!state.frecuencia) state.frecuencia = {};
+  if (!state.paradasOverrides || typeof state.paradasOverrides !== "object") state.paradasOverrides = {};
   if (!("paradaSeleccionadaId" in state)) state.paradaSeleccionadaId = null;
   if (typeof state.sonidoActivo !== "boolean") state.sonidoActivo = true;
+  if (!state.taxistaId) state.taxistaId = "tx_" + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+  if (!Array.isArray(state.historialPublicaciones)) state.historialPublicaciones = [];
+  if (!Array.isArray(state.colaPublicacion)) state.colaPublicacion = [];
+  if (!state.fabPos || typeof state.fabPos !== "object" || typeof state.fabPos.left !== "number") state.fabPos = null;
+  state.paradasUsuario = (state.paradasUsuario || []).map(p => {
+    if (p.creador) {
+      if (!p.creadaEn) p.creadaEn = Date.now();
+      if (!p.expira) p.expira = p.creadaEn + PARADA_VIDA_MS;
+      if (!p.verificaciones) p.verificaciones = { [p.creador]: p.creadaEn };
+      if (typeof p.confirmada !== "boolean") p.confirmada = Object.keys(p.verificaciones).length >= PARADA_MIN_VERIF;
+    }
+    return p;
+  });
 }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
 function uid(p){ return `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`; }
-function getAllParadas() { return [...PARADAS_CATALOGO, ...state.paradasUsuario]; }
+
+function getAllParadas() {
+  const catalogo = PARADAS_CATALOGO.map(p => {
+    const ov = state.paradasOverrides?.[p.id];
+    return ov ? { ...p, ...ov } : p;
+  });
+  return [...catalogo, ...state.paradasUsuario];
+}
+function esParadaEditada(id) { return !!state.paradasOverrides?.[id]; }
+function getTaxistaId(){ if (!state.taxistaId) { state.taxistaId = "tx_" + Math.random().toString(36).slice(2,10); save(); } return state.taxistaId; }
 
 /* ===================== Formato ===================== */
 const euro = new Intl.NumberFormat("es-ES",{style:"currency",currency:"EUR"});
@@ -310,6 +326,13 @@ function formatDuration(totalSec){
   if (h>0) return `${h}h ${String(m).padStart(2,"0")}m`;
   if (m>0) return `${m}m ${String(sec).padStart(2,"0")}s`;
   return `${sec}s`;
+}
+function formatHorasRestantes(ms) {
+  if (ms <= 0) return "0h";
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
 }
 function startOfDay(ts=Date.now()){ const d=new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
 function startOfWeek(ts=Date.now()){ const d=new Date(startOfDay(ts)); const day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.getTime(); }
@@ -327,34 +350,18 @@ const proximityState = {};
 const PAGO_LABEL  = { efectivo:"Efectivo", tarjeta:"Tarjeta", app:"App" };
 const GASTO_LABEL = { combustible:"Combustible", peaje:"Peaje", comida:"Comida", parking:"Parking", lavado:"Lavado", otros:"Otros" };
 
-/* ===================== Frecuencia de carga por parada ===================== */
-/**
- * Devuelve un resumen de "frecuencia de carga" combinando:
- *  - avisos "hay público" recibidos (state.frecuencia)
- *  - visitas registradas (state.waitRecords)
- */
+/* ===================== Frecuencia de carga ===================== */
 function getFrecuencia(paradaId) {
   const f = state.frecuencia?.[paradaId] || { total: 0, ultimoTs: 0 };
   const visitas = (state.waitRecords?.[paradaId]?.length) || 0;
   const total = f.total + visitas;
-
   let nivel, label, colorHex, bgClass;
-  if (total === 0) {
-    nivel="sin_datos"; label="Sin datos"; colorHex="#888";
-    bgClass="bg-neutral-700/30 text-neutral-400";
-  } else if (total >= 30) {
-    nivel="alta"; label="Alta"; colorHex="#ef4444";
-    bgClass="bg-red-500/20 text-red-400";
-  } else if (total >= 10) {
-    nivel="media"; label="Media"; colorHex="#f59e0b";
-    bgClass="bg-yellow-500/20 text-yellow-400";
-  } else {
-    nivel="baja"; label="Baja"; colorHex="#22c55e";
-    bgClass="bg-green-500/20 text-green-400";
-  }
+  if (total === 0) { nivel="sin_datos"; label="Sin datos"; colorHex="#888"; bgClass="bg-neutral-700/30 text-neutral-400"; }
+  else if (total >= 30) { nivel="alta"; label="Alta"; colorHex="#ef4444"; bgClass="bg-red-500/20 text-red-400"; }
+  else if (total >= 10) { nivel="media"; label="Media"; colorHex="#f59e0b"; bgClass="bg-yellow-500/20 text-yellow-400"; }
+  else { nivel="baja"; label="Baja"; colorHex="#22c55e"; bgClass="bg-green-500/20 text-green-400"; }
   return { nivel, label, colorHex, bgClass, total, avisos: f.total, visitas, ultimoTs: f.ultimoTs };
 }
-
 function registrarFrecuenciaAviso(paradaId, ts) {
   if (!paradaId) return;
   if (!state.frecuencia) state.frecuencia = {};
@@ -364,7 +371,7 @@ function registrarFrecuenciaAviso(paradaId, ts) {
   state.frecuencia[paradaId] = f;
 }
 
-/* ===================== Hash determinista para canales ===================== */
+/* ===================== Hash determinista ===================== */
 function fnv1a(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -379,6 +386,84 @@ function hashCanal(seed, id) {
   return PREFIJO_CANAL + a + b;
 }
 
+/* ===================== Rate limit ===================== */
+function puedePublicar(tipo) {
+  const ahora = Date.now();
+  state.historialPublicaciones = (state.historialPublicaciones || [])
+    .filter(t => ahora - t.ts < RATE_LIMIT_VENTANA_MS);
+  const count = state.historialPublicaciones.filter(t => t.tipo === tipo).length;
+  if (count >= RATE_LIMIT_MAX) {
+    const restante = RATE_LIMIT_VENTANA_MS - (ahora - state.historialPublicaciones.find(t => t.tipo === tipo).ts);
+    showToast(`⏳ Límite alcanzado (${RATE_LIMIT_MAX}/${RATE_LIMIT_VENTANA_MS/60000}min). Espera ${Math.ceil(restante/60000)} min.`);
+    return false;
+  }
+  return true;
+}
+function registrarPublicacion(tipo) {
+  if (!state.historialPublicaciones) state.historialPublicaciones = [];
+  state.historialPublicaciones.push({ tipo, ts: Date.now() });
+  state.historialPublicaciones = state.historialPublicaciones.filter(t => Date.now() - t.ts < RATE_LIMIT_VENTANA_MS);
+  save();
+}
+
+/* ===================== Cola de publicación con reintentos ===================== */
+let procesandoCola = false;
+async function publicarEnNtfy(canal, headers, body, tipo) {
+  if (!puedePublicar(tipo)) return false;
+  registrarPublicacion(tipo);
+  state.colaPublicacion.push({ canal, headers, body, tipo, intentos: 0, ts: Date.now() });
+  save();
+  actualizarBadgeRed();
+  procesarCola();
+  return true;
+}
+
+async function procesarCola() {
+  if (procesandoCola) return;
+  if (!state.colaPublicacion || state.colaPublicacion.length === 0) { actualizarBadgeRed(); return; }
+  procesandoCola = true;
+  while (state.colaPublicacion.length > 0) {
+    const item = state.colaPublicacion[0];
+    try {
+      const res = await fetch(`${NTFY_BASE}/${encodeURIComponent(item.canal)}`, {
+        method:"POST", headers: item.headers, body: item.body,
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      state.colaPublicacion.shift();
+      save();
+      actualizarBadgeRed();
+    } catch(e) {
+      item.intentos++;
+      if (item.intentos >= MAX_INTENTOS_COLA) {
+        state.colaPublicacion.shift();
+        save();
+        showToast(`⚠️ No se pudo enviar tras ${MAX_INTENTOS_COLA} intentos`);
+      } else {
+        save();
+        actualizarBadgeRed();
+        await new Promise(r => setTimeout(r, 3000 * item.intentos));
+      }
+    }
+  }
+  procesandoCola = false;
+  actualizarBadgeRed();
+}
+
+function actualizarBadgeRed() {
+  let badge = document.getElementById("net-badge");
+  const pendientes = (state.colaPublicacion || []).length;
+  if (pendientes > 0) {
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "net-badge";
+      document.body.appendChild(badge);
+    }
+    badge.textContent = `📡 ${pendientes} pendiente${pendientes===1?"":"s"}`;
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
 /* ===================== Clusters ===================== */
 function esCentro(p) { return distanceMeters(SOL_LAT, SOL_LNG, p.lat, p.lng) < CENTRO_RADIO_M; }
 
@@ -386,14 +471,8 @@ function calcularClusters() {
   const paradas = getAllParadas();
   const padre = {};
   paradas.forEach(p => { padre[p.id] = p.id; });
-  function find(x) {
-    while (padre[x] !== x) { padre[x] = padre[padre[x]]; x = padre[x]; }
-    return x;
-  }
-  function union(a, b) {
-    const ra = find(a), rb = find(b);
-    if (ra !== rb) padre[ra] = rb;
-  }
+  function find(x) { while (padre[x] !== x) { padre[x] = padre[padre[x]]; x = padre[x]; } return x; }
+  function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) padre[ra] = rb; }
   for (let i = 0; i < paradas.length; i++) {
     for (let j = i+1; j < paradas.length; j++) {
       const a = paradas[i], b = paradas[j];
@@ -424,7 +503,6 @@ function calcularClusters() {
   });
   return Object.values(grupos);
 }
-
 let CLUSTERS = [];
 function recalcularClusters() { CLUSTERS = calcularClusters(); }
 
@@ -437,37 +515,35 @@ function getClusterActual() {
   });
   return mejor;
 }
-
 function getClustersCercanos(n) {
   if (!lastPosition || CLUSTERS.length === 0) return [];
   return CLUSTERS
     .map(c => ({ c, d: distanceMeters(lastPosition.lat, lastPosition.lng, c.centroid.lat, c.centroid.lng) }))
-    .sort((a,b) => a.d - b.d)
-    .slice(0, n)
-    .map(x => x.c);
+    .sort((a,b) => a.d - b.d).slice(0, n).map(x => x.c);
 }
 
 /* ===================== Suscripciones SSE ===================== */
 const suscripciones = {};
 
 function gestionarSuscripciones() {
+  if (document.hidden) return;
   if (!lastPosition || CLUSTERS.length === 0) return;
   const deseados = getClustersCercanos(CLUSTERS_VECINOS).map(c => c.id);
   const deseadosSet = new Set(deseados);
-
   Object.keys(suscripciones).forEach(id => {
-    if (!deseadosSet.has(id)) {
-      try { suscripciones[id].close(); } catch(e){}
-      delete suscripciones[id];
-    }
+    if (!deseadosSet.has(id)) { try { suscripciones[id].close(); } catch(e){} delete suscripciones[id]; }
   });
-
   deseados.forEach(id => {
     if (!suscripciones[id]) {
       const c = CLUSTERS.find(x => x.id === id);
       if (c) suscribirCluster(c);
     }
   });
+}
+
+function cerrarTodasSuscripciones() {
+  Object.values(suscripciones).forEach(es => { try { es.close(); } catch(e){} });
+  Object.keys(suscripciones).forEach(k => delete suscripciones[k]);
 }
 
 async function suscribirCluster(cluster) {
@@ -480,12 +556,12 @@ async function suscribirCluster(cluster) {
         const data = JSON.parse(line);
         if (data.event === "message" && data.message) {
           const payload = JSON.parse(data.message);
-          if (payload.type === "hayPublico") procesarAviso(payload, false);
+          procesarMensajeCluster(payload, false);
         }
       } catch(e){}
     });
   } catch(e) {}
-
+  if (document.hidden) return;
   try {
     const es = new EventSource(`${NTFY_BASE}/${encodeURIComponent(canal)}/sse`);
     es.onmessage = (e) => {
@@ -493,7 +569,7 @@ async function suscribirCluster(cluster) {
         const data = JSON.parse(e.data);
         if (data.event === "message" && data.message) {
           const payload = JSON.parse(data.message);
-          if (payload.type === "hayPublico") procesarAviso(payload, true);
+          procesarMensajeCluster(payload, true);
         }
       } catch(err) {}
     };
@@ -502,65 +578,136 @@ async function suscribirCluster(cluster) {
   } catch(e) {}
 }
 
-function procesarAviso(payload, esNuevo) {
-  if (lastPosition) {
-    const d = distanceMeters(lastPosition.lat, lastPosition.lng, payload.lat, payload.lng);
-    if (d > FILTRO_RADIO_AVISO_M) return;
-  }
-  if (state.hayPublico.find(a => a.id === payload.id)) return;
-  addHayPublico(payload);
-  if (esNuevo) notificarAviso(payload);
-}
-
-/* ===================== Feedback (sonido + vibración + notificación) ===================== */
-let audioCtx = null;
-function beep() {
-  if (!state.sonidoActivo) return;
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.25);
-  } catch(e) {}
-}
-
-function notificarAviso(payload) {
-  try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch(e){}
-  beep();
-  if ("Notification" in window && Notification.permission === "granted") {
-    try {
-      new Notification("🔥 Hay público", {
-        body: payload.paradaNombre ? `En ${payload.paradaNombre}` : "En tu zona",
-        tag: "hay-publico-" + payload.id,
-        icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🔥</text></svg>",
-      });
-    } catch(e) {}
+function procesarMensajeCluster(payload, esNuevo) {
+  if (!payload || !payload.type) return;
+  if (payload.type === "hayPublico") procesarAviso(payload, esNuevo);
+  else if (payload.type === "nuevaParada") recibirNuevaParada(payload);
+  else if (payload.type === "paradaVerify") aplicarVerificacion(payload.paradaId, payload.taxistaId, payload.ts);
+  else if (payload.type === "paradaVerifyBatch") {
+    (payload.paradaIds || []).forEach(id => aplicarVerificacion(id, payload.taxistaId, payload.ts));
   }
 }
 
-async function pedirPermisoNotificaciones() {
-  if ("Notification" in window && Notification.permission === "default") {
-    try { await Notification.requestPermission(); } catch(e){}
+/* ===================== Publicar parada nueva ===================== */
+async function publicarNuevaParada(parada) {
+  const cluster = getClusterActual();
+  const canal = cluster ? cluster.canal : CANAL_GLOBAL;
+  const payload = {
+    type: "nuevaParada",
+    parada: {
+      id: parada.id, nombre: parada.nombre,
+      municipio: parada.municipio, barrio: parada.barrio,
+      plazas: parada.plazas, horario: parada.horario,
+      lat: parada.lat, lng: parada.lng,
+      creador: parada.creador, creadaEn: parada.creadaEn, expira: parada.expira,
+    },
+    ts: Date.now(),
+  };
+  const headers = { "Content-Type":"application/json", "Title":"Nueva parada", "Tags":"taxi", "Priority":"default" };
+  return publicarEnNtfy(canal, headers, JSON.stringify(payload), "nuevaParada");
+}
+
+function recibirNuevaParada(payload) {
+  const p = payload.parada;
+  if (!p || !p.id) return;
+  if (getAllParadas().some(x => x.id === p.id)) return;
+  if (p.creador === getTaxistaId()) return;
+  if (p.expira && p.expira < Date.now()) return;
+  const nueva = {
+    id: p.id, nombre: p.nombre, municipio: p.municipio, barrio: p.barrio,
+    plazas: p.plazas, horario: p.horario, lat: p.lat, lng: p.lng,
+    creador: p.creador, creadaEn: p.creadaEn || Date.now(),
+    expira: p.expira || Date.now() + PARADA_VIDA_MS,
+    verificaciones: { [p.creador]: p.creadaEn || Date.now() },
+    confirmada: false,
+  };
+  state.paradasUsuario.push(nueva);
+  save();
+  recalcularClusters();
+  showToast(`📍 Nueva parada recibida: ${p.nombre}`);
+  if (state.view === "paradas") render();
+}
+
+/* ===================== Batching de verificaciones ===================== */
+let bufferVerificaciones = [];
+let timerVerif = null;
+
+function encolarVerificacion(paradaId) {
+  if (!bufferVerificaciones.includes(paradaId)) bufferVerificaciones.push(paradaId);
+  aplicarVerificacion(paradaId, getTaxistaId(), Date.now());
+  if (timerVerif) return;
+  timerVerif = setTimeout(flushVerificaciones, BATCH_VERIF_MS);
+}
+
+async function flushVerificaciones() {
+  timerVerif = null;
+  if (bufferVerificaciones.length === 0) return;
+  const ids = bufferVerificaciones.slice();
+  bufferVerificaciones = [];
+  const cluster = getClusterActual();
+  const canal = cluster ? cluster.canal : CANAL_GLOBAL;
+  const payload = {
+    type: "paradaVerifyBatch",
+    paradaIds: ids,
+    taxistaId: getTaxistaId(),
+    ts: Date.now(),
+  };
+  const headers = { "Content-Type":"application/json", "Title":"Verificaciones", "Priority":"low" };
+  await publicarEnNtfy(canal, headers, JSON.stringify(payload), "verificacion");
+}
+
+function aplicarVerificacion(paradaId, taxistaId, ts) {
+  const p = state.paradasUsuario.find(x => x.id === paradaId);
+  if (!p) return;
+  if (!p.verificaciones) p.verificaciones = {};
+  if (p.verificaciones[taxistaId]) return;
+  p.verificaciones[taxistaId] = ts || Date.now();
+  const n = Object.keys(p.verificaciones).length;
+  if (n >= PARADA_MIN_VERIF && !p.confirmada) {
+    p.confirmada = true;
+    showToast(`✅ Parada confirmada: ${p.nombre}`);
+  }
+  save();
+  if (state.view === "paradas") render();
+}
+
+/* ===================== Ciclo de vida de paradas ===================== */
+function mantenimientoParadas() {
+  const ahora = Date.now();
+  let cambiado = false;
+  state.paradasUsuario = (state.paradasUsuario || []).filter(p => {
+    if (!p.creador) return true;
+    if (p.confirmada) return true;
+    if (!p.expira) p.expira = (p.creadaEn || ahora) + PARADA_VIDA_MS;
+    if (ahora < p.expira) return true;
+    const ventanaInicio = p.expira - PARADA_VIDA_MS;
+    const verificacionesNuevas = Object.entries(p.verificaciones || {})
+      .filter(([tid, ts]) => tid !== p.creador && ts >= ventanaInicio && ts <= p.expira)
+      .length;
+    if (verificacionesNuevas >= PARADA_MIN_EXTENDER) {
+      p.expira = ahora + PARADA_VIDA_MS;
+      cambiado = true;
+      return true;
+    }
+    cambiado = true;
+    return false;
+  });
+  if (cambiado) {
+    save();
+    recalcularClusters();
+    if (state.view === "paradas") render();
   }
 }
 
-/* ===================== Hay Público ===================== */
+/* ===================== Avisos "Hay público" ===================== */
 let fireMarkers = [];
 
-function notificarHayPublico() {
+async function notificarHayPublico() {
   if (!lastPosition) { showToast("⚠️ Necesito tu ubicación GPS"); return; }
-
   const cercanas = getAllParadas()
     .map(p => ({ p, d: distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) }))
     .sort((a,b) => a.d - b.d);
   const parada = cercanas[0] && cercanas[0].d < 300 ? cercanas[0].p : null;
-
   const clave = parada?.id || `${lastPosition.lat.toFixed(3)}_${lastPosition.lng.toFixed(3)}`;
   const ultimo = state.ultimoAviso[clave] || 0;
   const ahora = Date.now();
@@ -569,51 +716,81 @@ function notificarHayPublico() {
     showToast(`⏳ Espera ${seg}s antes de volver a avisar aquí`);
     return;
   }
-
   if (parada) {
-    const reciente = state.hayPublico.find(a =>
-      a.paradaId === parada.id && (ahora - a.ts) < MISMA_PARADA_DEDUP_MS
-    );
-    if (reciente) {
-      showToast(`🔥 Ya hay un aviso activo en ${parada.nombre}`);
-      return;
-    }
+    const reciente = state.hayPublico.find(a => a.paradaId === parada.id && (ahora - a.ts) < MISMA_PARADA_DEDUP_MS);
+    if (reciente) { showToast(`🔥 Ya hay un aviso activo en ${parada.nombre}`); return; }
   }
-
   const cluster = getClusterActual();
   if (!cluster) { showToast("⚠️ No puedo determinar tu zona"); return; }
 
   const msg = {
-    type: "hayPublico",
-    id: uid("hp"),
-    lat: lastPosition.lat,
-    lng: lastPosition.lng,
-    paradaId: parada?.id || null,
-    paradaNombre: parada?.nombre || null,
-    clusterId: cluster.id,
-    usuario: state.conductor || "Taxi",
-    ts: ahora,
+    type:"hayPublico", id: uid("hp"),
+    lat: lastPosition.lat, lng: lastPosition.lng,
+    paradaId: parada?.id || null, paradaNombre: parada?.nombre || null,
+    clusterId: cluster.id, usuario: state.conductor || "Taxi", ts: ahora,
   };
-
   state.ultimoAviso[clave] = ahora;
   addHayPublico(msg);
+  const headers = { "Content-Type":"application/json", "Title":"Hay público", "Priority":"high", "Tags":"fire" };
+  const ok = await publicarEnNtfy(cluster.canal, headers, JSON.stringify(msg), "hayPublico");
+  if (ok) showToast(`🔥 Enviado a ${cluster.nombre}`);
+}
 
-  fetch(`${NTFY_BASE}/${encodeURIComponent(cluster.canal)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Title": "Hay público", "Priority": "high", "Tags": "fire" },
-    body: JSON.stringify(msg),
-  }).then(() => {
-    showToast(`🔥 Enviado a ${cluster.nombre}`);
-  }).catch(() => {
-    showToast("⚠️ No se pudo enviar (revisa conexión)");
+/* ---------- Confirmación previa al aviso ---------- */
+function pedirConfirmacionHayPublico() {
+  if (document.getElementById("modal-confirm-hp")) return;
+  if (!lastPosition) { showToast("⚠️ Necesito tu ubicación GPS"); return; }
+
+  const cercanas = getAllParadas()
+    .map(p => ({ p, d: distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) }))
+    .sort((a,b) => a.d - b.d);
+  const parada = cercanas[0] && cercanas[0].d < 300 ? cercanas[0].p : null;
+  const cluster = getClusterActual();
+
+  let sitio;
+  if (parada) {
+    sitio = `en <b>${esc(parada.nombre)}</b>`;
+  } else if (cluster?.nombre) {
+    sitio = `en la zona <b>${esc(cluster.nombre.toUpperCase())}</b>`;
+  } else {
+    sitio = "en tu ubicación actual";
+  }
+
+  const coords = `${lastPosition.lat.toFixed(5)}, ${lastPosition.lng.toFixed(5)}`;
+
+  const modal = document.createElement("div");
+  modal.id = "modal-confirm-hp";
+  modal.className = "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4";
+  modal.innerHTML = `
+    <div class="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div>
+        <div class="text-xs text-red-400 font-semibold uppercase tracking-wide">🔥 Confirmar aviso</div>
+        <h3 class="text-lg font-bold mt-1">¿Hay público ahora mismo?</h3>
+        <p class="text-sm text-neutral-300 mt-2 leading-relaxed">Se avisará a los taxistas de la red ${sitio}.</p>
+        <p class="text-[11px] text-neutral-500 mt-1 font-mono">${coords}</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="hp-no" class="flex-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2.5 font-medium">Cancelar</button>
+        <button id="hp-si" class="flex-1 rounded-lg bg-gradient-to-r from-brand-500 to-red-600 hover:opacity-90 py-2.5 font-bold text-white">Sí, hay público</button>
+      </div>
+      <p class="text-[10px] text-neutral-600 text-center">Arrastra el botón 🔥 para moverlo de sitio</p>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  document.getElementById("hp-no").addEventListener("click", close);
+  document.getElementById("hp-si").addEventListener("click", async () => {
+    close();
+    try { navigator.vibrate && navigator.vibrate(40); } catch(e){}
+    await notificarHayPublico();
   });
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
 }
 
 function addHayPublico(msg) {
   if (!state.hayPublico) state.hayPublico = [];
   if (state.hayPublico.find(a => a.id === msg.id)) return;
   state.hayPublico.push(msg);
-  // Cuenta persistente para "frecuencia de carga"
   if (msg.paradaId) registrarFrecuenciaAviso(msg.paradaId, msg.ts);
   limpiarHayPublico();
   save();
@@ -640,18 +817,27 @@ function limpiarHayPublico() {
   return antes !== state.hayPublico.length;
 }
 
+function procesarAviso(payload, esNuevo) {
+  if (!payload || typeof payload.lat !== "number" || typeof payload.lng !== "number") return;
+  if (lastPosition) {
+    const d = distanceMeters(lastPosition.lat, lastPosition.lng, payload.lat, payload.lng);
+    if (d > FILTRO_RADIO_AVISO_M) return;
+  }
+  if (state.hayPublico.find(a => a.id === payload.id)) return;
+  addHayPublico(payload);
+  if (esNuevo) notificarAviso(payload);
+}
+
 function updateFireMarkers() {
   if (!map) return;
   fireMarkers.forEach(m => { try { map.removeLayer(m); } catch(e){} });
   fireMarkers = [];
-
   const grupos = {};
   state.hayPublico.forEach(a => {
     const key = a.paradaId || `${a.lat.toFixed(3)}_${a.lng.toFixed(3)}`;
     if (!grupos[key]) grupos[key] = { lat: a.lat, lng: a.lng, items: [] };
     grupos[key].items.push(a);
   });
-
   const now = Date.now();
   Object.values(grupos).forEach(g => {
     const n = g.items.length;
@@ -671,11 +857,7 @@ function updateFireMarkers() {
 function updateTicker() {
   const el = document.getElementById("news-ticker");
   if (!el) return;
-  if (!state.hayPublico || state.hayPublico.length === 0) {
-    el.classList.add("hidden");
-    el.innerHTML = "";
-    return;
-  }
+  if (!state.hayPublico || state.hayPublico.length === 0) { el.classList.add("hidden"); el.innerHTML = ""; return; }
   const sorted = [...state.hayPublico].sort((a,b) => b.ts - a.ts);
   const now = Date.now();
   const items = sorted.map(a => {
@@ -687,6 +869,55 @@ function updateTicker() {
   el.classList.remove("hidden");
   el.innerHTML = `<div class="ticker-track">${items.join("     •     ")}</div>`;
 }
+
+/* ===================== Feedback ===================== */
+let audioCtx = null;
+function beep() {
+  if (!state.sonidoActivo) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine"; osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+  } catch(e) {}
+}
+function notificarAviso(payload) {
+  try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch(e){}
+  beep();
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification("🔥 Hay público", {
+        body: payload.paradaNombre ? `En ${payload.paradaNombre}` : "En tu zona",
+        tag: "hay-publico-" + payload.id,
+      });
+    } catch(e) {}
+  }
+}
+async function pedirPermisoNotificaciones() {
+  if ("Notification" in window && Notification.permission === "default") {
+    try { await Notification.requestPermission(); } catch(e){}
+  }
+}
+
+/* ===================== Background / Foreground ===================== */
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    cerrarTodasSuscripciones();
+    if (timerVerif) { clearTimeout(timerVerif); timerVerif = null; }
+  } else {
+    if (lastPosition) {
+      gestionarSuscripciones();
+      if (bufferVerificaciones.length > 0) flushVerificaciones();
+    }
+    procesarCola();
+  }
+});
+window.addEventListener("online", () => { procesarCola(); });
+window.addEventListener("offline", () => { actualizarBadgeRed(); });
 
 /* ===================== Render raíz ===================== */
 const root = document.getElementById("root");
@@ -714,10 +945,9 @@ function render() {
       <div id="waiting-banner" class="hidden"></div>
       <main class="flex-1 pb-20 overflow-y-auto" id="main-view"></main>
 
-      <button id="fab-hay-publico" title="Avisar de que hay público">🔥 Hay público</button>
+      <button id="fab-hay-publico" title="Toca para avisar · Arrastra para mover">🔥<span class="fab-label"> Hay público</span></button>
 
       <div id="news-ticker" class="hidden"></div>
-
       <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-neutral-950/95 backdrop-blur border-t border-neutral-800 grid grid-cols-6 z-[500]">
         ${[
           { id:"home", label:"Inicio", emoji:"🏠" },
@@ -735,14 +965,122 @@ function render() {
   `;
   document.getElementById("main-view").innerHTML = renderView();
   root.querySelectorAll("[data-nav]").forEach(b => b.addEventListener("click", () => { state.view=b.dataset.nav; save(); render(); }));
-  document.getElementById("fab-hay-publico").addEventListener("click", () => notificarHayPublico());
+
+  initFab();
   bindViewEvents();
   updateWaitingBanner();
   updateTicker();
+  actualizarBadgeRed();
 
   if (state.view === "paradas") requestAnimationFrame(() => { initMap(); });
   if (state.view === "jornada") requestAnimationFrame(() => { initJornadaCharts(); });
 }
+
+/* ===================== FAB: arrastrable + tap con confirmación ===================== */
+function clampFabToViewport(left, top, w, h) {
+  const maxLeft = Math.max(FAB_MARGIN_PX, window.innerWidth - w - FAB_MARGIN_PX);
+  const maxTop  = Math.max(FAB_MARGIN_PX, window.innerHeight - h - 62 - FAB_MARGIN_PX); // 62 = altura nav
+  return {
+    left: Math.max(FAB_MARGIN_PX, Math.min(maxLeft, left)),
+    top:  Math.max(FAB_MARGIN_PX, Math.min(maxTop,  top)),
+  };
+}
+
+function initFab() {
+  const fab = document.getElementById("fab-hay-publico");
+  if (!fab) return;
+
+  // Aplicar posición guardada
+  if (state.fabPos) {
+    const rect = fab.getBoundingClientRect();
+    const c = clampFabToViewport(state.fabPos.left, state.fabPos.top, rect.width || 120, rect.height || 32);
+    fab.style.right = "auto";
+    fab.style.bottom = "auto";
+    fab.style.left = c.left + "px";
+    fab.style.top  = c.top  + "px";
+    if (c.left !== state.fabPos.left || c.top !== state.fabPos.top) {
+      state.fabPos = c; save();
+    }
+  }
+
+  let pointerId = null;
+  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  let moved = false;
+
+  const onDown = (e) => {
+    if (pointerId !== null) return;
+    if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
+    pointerId = e.pointerId;
+    try { fab.setPointerCapture(pointerId); } catch(err){}
+    const r = fab.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    startLeft = r.left;  startTop = r.top;
+    moved = false;
+    fab.classList.add("dragging");
+    e.preventDefault();
+  };
+
+  const onMove = (e) => {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved && Math.hypot(dx, dy) > FAB_DRAG_THRESHOLD_PX) moved = true;
+    if (!moved) return;
+    const r = fab.getBoundingClientRect();
+    const c = clampFabToViewport(startLeft + dx, startTop + dy, r.width, r.height);
+    fab.style.right = "auto";
+    fab.style.bottom = "auto";
+    fab.style.left = c.left + "px";
+    fab.style.top  = c.top  + "px";
+  };
+
+  const onUp = (e) => {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+    const wasMoved = moved;
+    moved = false;
+    pointerId = null;
+    fab.classList.remove("dragging");
+    try { fab.releasePointerCapture(e.pointerId); } catch(err){}
+
+    if (wasMoved) {
+      const r = fab.getBoundingClientRect();
+      state.fabPos = { left: r.left, top: r.top };
+      save();
+    } else {
+      // TAP: pedir confirmación
+      try { navigator.vibrate && navigator.vibrate(20); } catch(err){}
+      pedirConfirmacionHayPublico();
+    }
+  };
+
+  const onCancel = (e) => {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+    moved = false; pointerId = null;
+    fab.classList.remove("dragging");
+  };
+
+  fab.addEventListener("pointerdown", onDown);
+  fab.addEventListener("pointermove", onMove);
+  fab.addEventListener("pointerup", onUp);
+  fab.addEventListener("pointercancel", onCancel);
+  // Evita menú contextual (long press en móvil)
+  fab.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+// Reajustar al girar / cambiar tamaño
+window.addEventListener("resize", () => {
+  if (!state.fabPos) return;
+  const fab = document.getElementById("fab-hay-publico");
+  if (!fab) return;
+  const r = fab.getBoundingClientRect();
+  const c = clampFabToViewport(r.left, r.top, r.width, r.height);
+  if (c.left !== r.left || c.top !== r.top) {
+    state.fabPos = c;
+    fab.style.left = c.left + "px";
+    fab.style.top  = c.top  + "px";
+    save();
+  }
+});
 
 /* ---------- Home ---------- */
 function renderHome() {
@@ -756,6 +1094,9 @@ function renderHome() {
   const activa = !!state.jornadaActivaId;
   const clusterActual = getClusterActual();
   const nZonas = Object.keys(suscripciones).length;
+  const comunitarias = state.paradasUsuario.filter(p => p.creador);
+  const pendientes = comunitarias.filter(p => !p.confirmada && (p.expira||0) > Date.now()).length;
+  const pendientesRed = (state.colaPublicacion || []).length;
   return `
     <div class="p-4 space-y-4">
       <div class="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-5 text-brand-900">
@@ -777,6 +1118,16 @@ function renderHome() {
           <div class="text-sm text-brand-500 font-semibold">Estás en zona <span class="uppercase">${esc(clusterActual.nombre)}</span></div>
           <div class="text-[11px] text-neutral-500">${clusterActual.paradas.length} parada${clusterActual.paradas.length===1?"":"s"} · enlace ${esCentro({lat:lastPosition?.lat||0,lng:lastPosition?.lng||0})?"1 km":"5 km"}</div>
         ` : `<div class="text-[11px] text-neutral-500">Esperando ubicación GPS…</div>`}
+        ${comunitarias.length > 0 ? `
+          <div class="text-[11px] text-neutral-400 pt-1 border-t border-neutral-800 mt-1">
+            🚕 <b>${comunitarias.length}</b> parada${comunitarias.length===1?"":"s"} comunitarias · <span class="text-yellow-400">${pendientes} pendiente${pendientes===1?"":"s"} de verificar</span>
+          </div>
+        ` : ""}
+        ${pendientesRed > 0 ? `
+          <div class="text-[11px] text-yellow-400 pt-1 border-t border-neutral-800">
+            📡 ${pendientesRed} mensaje${pendientesRed===1?"":"s"} pendiente${pendientesRed===1?"":"s"} de enviar
+          </div>
+        ` : ""}
         <div class="flex gap-2 pt-1">
           <button id="btn-toggle-sonido" class="flex-1 rounded-lg ${state.sonidoActivo ? 'bg-brand-500 text-brand-900' : 'bg-neutral-800 text-neutral-300 border border-neutral-700'} py-1.5 text-xs font-semibold">
             ${state.sonidoActivo ? "🔔 Avisos activos" : "🔕 Avisos silenciados"}
@@ -914,7 +1265,6 @@ function renderJornadaResumen(jornada, titulo) {
 function initJornadaCharts() {
   destroyCharts();
   if (typeof Chart === "undefined") return;
-
   document.querySelectorAll('canvas[id^="chart-horas-"]').forEach(canvas => {
     const jornadaId = canvas.id.replace("chart-horas-","");
     const jornada = state.jornadas.find(j => j.id === jornadaId);
@@ -929,28 +1279,15 @@ function initJornadaCharts() {
     const serviciosHora = horas.map(h => d.svcs.filter(s => new Date(s.at).getHours() === h).length);
     const chart = new Chart(canvas, {
       type: "bar",
-      data: {
-        labels: horas.map(h => String(h).padStart(2,"0")+"h"),
-        datasets: [{ data: ingresosHora, backgroundColor: "#f5b400", borderRadius: 4, maxBarThickness: 34 }]
-      },
+      data: { labels: horas.map(h => String(h).padStart(2,"0")+"h"), datasets: [{ data: ingresosHora, backgroundColor: "#f5b400", borderRadius: 4, maxBarThickness: 34 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => {
-            const n = serviciosHora[ctx.dataIndex];
-            return [`${formatEuro(ctx.parsed.y)}`, `${n} servicio${n===1?"":"s"}`];
-          }}}
-        },
-        scales: {
-          x: { ticks: { color:"#888", font:{size:9} }, grid: { display:false } },
-          y: { ticks: { color:"#888", font:{size:9}, callback: v => v+"€" }, grid: { color:"#222" }, beginAtZero: true }
-        }
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => { const n = serviciosHora[ctx.dataIndex]; return [`${formatEuro(ctx.parsed.y)}`, `${n} servicio${n===1?"":"s"}`]; } } } },
+        scales: { x: { ticks: { color:"#888", font:{size:9} }, grid: { display:false } }, y: { ticks: { color:"#888", font:{size:9}, callback: v => v+"€" }, grid: { color:"#222" }, beginAtZero: true } }
       }
     });
     activeCharts.push(chart);
   });
-
   document.querySelectorAll('canvas[id^="chart-gastos-"]').forEach(canvas => {
     const jornadaId = canvas.id.replace("chart-gastos-","");
     const jornada = state.jornadas.find(j => j.id === jornadaId);
@@ -962,16 +1299,9 @@ function initJornadaCharts() {
     d.gst.forEach(g => { tipos[g.tipo] = (tipos[g.tipo]||0) + g.importe; });
     const chart = new Chart(canvas, {
       type: "doughnut",
-      data: {
-        labels: Object.keys(tipos).map(t => GASTO_LABEL[t] || t),
-        datasets: [{ data: Object.values(tipos), backgroundColor: Object.keys(tipos).map(t => colores[t] || "#888"), borderWidth: 0 }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: "62%",
-        plugins: {
-          legend: { position:"bottom", labels: { color:"#ccc", font:{size:10}, boxWidth:12, padding:6 } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatEuro(ctx.parsed)}` } }
-        }
+      data: { labels: Object.keys(tipos).map(t => GASTO_LABEL[t] || t), datasets: [{ data: Object.values(tipos), backgroundColor: Object.keys(tipos).map(t => colores[t] || "#888"), borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: "62%",
+        plugins: { legend: { position:"bottom", labels: { color:"#ccc", font:{size:10}, boxWidth:12, padding:6 } }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatEuro(ctx.parsed)}` } } }
       }
     });
     activeCharts.push(chart);
@@ -1050,6 +1380,7 @@ function renderGastos() {
 function renderParadas() {
   const total = getAllParadas().length;
   const propias = state.paradasUsuario.length;
+  const comunitarias = state.paradasUsuario.filter(p => p.creador).length;
   return `
     <div class="p-4 space-y-4">
       <div class="flex items-center justify-between">
@@ -1066,13 +1397,13 @@ function renderParadas() {
       <div id="parada-seleccion-info"></div>
       <input id="paradas-q" placeholder="Buscar por nombre, barrio o municipio…" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
       <div class="flex items-center justify-between text-xs text-neutral-500">
-        <span>${total} paradas (${propias} tuyas)</span>
+        <span>${total} paradas · ${propias} tuyas · ${comunitarias} comunitaria${comunitarias===1?"":"s"}</span>
         <span id="paradas-count"></span>
       </div>
       <div class="space-y-2" id="paradas-lista"></div>
       <div id="parada-stats" class="space-y-2"></div>
       <p class="text-xs text-neutral-600">
-        Toca una parada para centrarla en el mapa · Pregunta tras 1 min parado a menos de ${RADIO_PREGUNTAR} m · Cierra la espera al superar ${RADIO_TERMINAR} m · Reset a los 30 min sin visitar.
+        Toca una parada para centrarla · Edita cualquier parada con ✏️ · Verifica una parada comunitaria estando a menos de ${PARADA_RADIO_VERIF_M} m.
       </p>
     </div>`;
 }
@@ -1096,7 +1427,6 @@ function seleccionarParada(id) {
   if (!p) return;
   state.paradaSeleccionadaId = id;
   save();
-
   if (map) {
     const targetZoom = Math.max(map.getZoom(), 16);
     try { map.flyTo([p.lat, p.lng], targetZoom, { duration: 0.6 }); }
@@ -1104,17 +1434,11 @@ function seleccionarParada(id) {
     updateParadaMarkerIcons();
     setTimeout(() => {
       const m = paradaMarkers[p.id];
-      if (m) {
-        m.openPopup();
-        setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 60);
-      }
+      if (m) { m.openPopup(); setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 60); }
     }, 650);
   }
-
-  // Repinta la lista para mostrar la selección
   const input = document.getElementById("paradas-q");
   if (input) input.dispatchEvent(new Event("input"));
-
   setTimeout(() => {
     const el = document.querySelector(`[data-parada-card="${id}"]`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1131,6 +1455,8 @@ function renderParadaSeleccionInfo() {
   if (!p) { el.innerHTML = ""; return; }
   const f = getFrecuencia(p.id);
   const dist = lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null;
+  const esComunitaria = !!p.creador;
+  const verificaciones = esComunitaria ? Object.keys(p.verificaciones || {}).length : 0;
   el.innerHTML = `
     <div class="rounded-xl bg-gradient-to-br from-brand-500/15 to-brand-600/5 border border-brand-500/40 p-3 space-y-2">
       <div class="flex items-start justify-between gap-2">
@@ -1139,15 +1465,28 @@ function renderParadaSeleccionInfo() {
           <div class="font-bold text-sm mt-0.5">${esc(p.nombre)}</div>
           <div class="text-xs text-neutral-400">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist<1000?Math.round(dist)+" m":(dist/1000).toFixed(1)+" km"}`:""}</div>
         </div>
-        <button id="btn-deseleccionar" class="text-xs text-neutral-400 hover:text-neutral-200 shrink-0">✕</button>
+        <div class="flex gap-1 shrink-0">
+          <button id="btn-edit-seleccion" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-2 py-1 text-neutral-300 hover:text-brand-500">✏️</button>
+          <button id="btn-deseleccionar" class="text-xs text-neutral-400 hover:text-neutral-200 px-2">✕</button>
+        </div>
       </div>
+      ${esParadaEditada(p.id) ? `<div class="text-[11px] text-yellow-400">✏️ Posición/datos editados localmente</div>` : ""}
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-[11px] rounded-full px-2 py-0.5 font-semibold ${f.bgClass}">📊 Frecuencia ${f.label}${f.total?` · ${f.total}`:""}</span>
         <span class="text-[11px] text-neutral-400">🔥 ${f.avisos} avisos</span>
         <span class="text-[11px] text-neutral-400">👥 ${f.visitas} visitas</span>
         <span class="text-[11px] text-neutral-400">🅿️ ${p.plazas} plazas</span>
       </div>
+      ${esComunitaria ? `
+        <div class="text-[11px] text-neutral-300 flex items-center gap-2">
+          ${p.confirmada
+            ? `<span class="text-green-400 font-semibold">✓ Confirmada (${verificaciones}/${PARADA_MIN_VERIF})</span>`
+            : `<span class="text-yellow-400">⏳ ${verificaciones}/${PARADA_MIN_VERIF} verificaciones · ${formatHorasRestantes((p.expira||0) - Date.now())} restantes</span>`}
+        </div>
+      ` : ""}
     </div>`;
+  const btnEdit = document.getElementById("btn-edit-seleccion");
+  if (btnEdit) btnEdit.addEventListener("click", () => mostrarFormularioParada(p.id));
   const btn = document.getElementById("btn-deseleccionar");
   if (btn) btn.addEventListener("click", () => {
     state.paradaSeleccionadaId = null;
@@ -1258,30 +1597,29 @@ function bindViewEvents() {
 
     const paint = (q="") => {
       const todas = getAllParadas();
-      const conDist = todas.map(p => ({
-        p,
-        dist: lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null,
-      }));
+      const conDist = todas.map(p => ({ p, dist: lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null }));
       const cercanas = lastPosition ? conDist.filter(x => x.dist < NEARBY_RADIUS_M) : conDist;
       cercanas.sort((a,b) => (a.dist ?? 0) - (b.dist ?? 0));
-      const filtradas = q
-        ? cercanas.filter(x => `${x.p.nombre} ${x.p.barrio} ${x.p.municipio}`.toLowerCase().includes(q.toLowerCase()))
-        : cercanas;
-
+      const filtradas = q ? cercanas.filter(x => `${x.p.nombre} ${x.p.barrio} ${x.p.municipio}`.toLowerCase().includes(q.toLowerCase())) : cercanas;
       if (countEl) countEl.textContent = `${filtradas.length} cerca`;
 
       lista.innerHTML = filtradas.length===0 ? `<p class="text-sm text-neutral-500">No hay paradas cerca.</p>` :
         filtradas.map(({p, dist}) => {
           const st = proximityState[p.id];
           const activo = st && st.status === "waiting";
-          const propia = state.paradasUsuario.some(x => x.id === p.id);
+          const esComunitaria = !!p.creador;
+          const esMiaComunitaria = esComunitaria && p.creador === getTaxistaId();
           const seleccionada = state.paradaSeleccionadaId === p.id;
           const frec = getFrecuencia(p.id);
           const fuegosAqui = state.hayPublico.filter(a => a.paradaId === p.id).length;
-
-          const borderClass = seleccionada
-            ? "border-brand-500 ring-2 ring-brand-500/30"
-            : (activo ? "border-brand-500" : "border-neutral-800");
+          const verificaciones = esComunitaria ? Object.keys(p.verificaciones || {}).length : 0;
+          const puedeVerificar = esComunitaria
+            && !p.confirmada
+            && (p.expira || 0) > Date.now()
+            && dist != null && dist <= PARADA_RADIO_VERIF_M
+            && !(p.verificaciones || {})[getTaxistaId()];
+          const yaVerificada = esComunitaria && !!(p.verificaciones || {})[getTaxistaId()];
+          const borderClass = seleccionada ? "border-brand-500 ring-2 ring-brand-500/30" : (activo ? "border-brand-500" : "border-neutral-800");
 
           return `
             <div data-parada-card="${p.id}" class="rounded-lg bg-neutral-900 border ${borderClass} p-3 cursor-pointer">
@@ -1289,10 +1627,24 @@ function bindViewEvents() {
                 <div class="flex-1 min-w-0">
                   <div class="font-medium flex items-center gap-2 flex-wrap">
                     ${activo?"⏱️ ":""}${esc(p.nombre)}
-                    ${propia?`<span class="text-[10px] rounded-full bg-brand-500/20 text-brand-500 px-2 py-0.5">tuya</span>`:""}
+                    ${esMiaComunitaria?`<span class="text-[10px] rounded-full bg-green-500/20 text-green-400 px-2 py-0.5">creada por ti</span>`:""}
+                    ${esComunitaria && !esMiaComunitaria?`<span class="text-[10px] rounded-full bg-blue-500/20 text-blue-400 px-2 py-0.5">comunitaria</span>`:""}
+                    ${esParadaEditada(p.id)?`<span class="text-[10px] rounded-full bg-yellow-500/20 text-yellow-400 px-2 py-0.5">✏️ editada</span>`:""}
                     ${fuegosAqui>0?`<span class="text-[10px] rounded-full bg-red-500/20 text-red-400 px-2 py-0.5">🔥 ${fuegosAqui}</span>`:""}
                   </div>
                   <div class="text-xs text-neutral-500 mt-0.5 truncate">${esc(p.barrio)}, ${esc(p.municipio)}${dist!=null?` · ${dist < 1000 ? Math.round(dist)+" m" : (dist/1000).toFixed(1)+" km"}`:""}</div>
+                  ${esComunitaria && !p.confirmada ? `
+                    <div class="mt-2">
+                      <div class="flex items-center justify-between text-[10px] text-neutral-400 mb-1">
+                        <span>⏳ ${verificaciones}/${PARADA_MIN_VERIF} verificaciones</span>
+                        <span>${formatHorasRestantes((p.expira||0) - Date.now())} restantes</span>
+                      </div>
+                      <div class="progress-bar"><div style="width:${Math.min(100,(verificaciones/PARADA_MIN_VERIF)*100)}%"></div></div>
+                    </div>
+                  ` : ""}
+                  ${esComunitaria && p.confirmada ? `
+                    <div class="mt-2 text-[10px] text-green-400 font-semibold">✓ Parada confirmada (${verificaciones}/${PARADA_MIN_VERIF})</div>
+                  ` : ""}
                   <div class="flex items-center gap-1.5 flex-wrap mt-2">
                     <span class="text-[10px] rounded-full px-2 py-0.5 font-semibold ${frec.bgClass}">📊 ${frec.label}${frec.total?` · ${frec.total}`:""}</span>
                     <span class="text-[10px] text-neutral-500">🔥 ${frec.avisos}</span>
@@ -1301,26 +1653,32 @@ function bindViewEvents() {
                   <div class="text-xs text-neutral-500 mt-1">${p.plazas} plazas · ${esc(p.horario)}</div>
                 </div>
                 <div class="flex flex-col gap-1 items-end shrink-0">
-                  <button data-ir-parada="${p.id}" class="text-xs rounded-full px-3 py-1 ${seleccionada?"bg-brand-500 text-brand-900 font-semibold":"bg-neutral-800 border border-neutral-700 text-brand-500"}">${seleccionada?"✓ Aquí":"Ir"}</button>
-                  ${propia?`<button data-del-parada="${p.id}" class="text-xs text-red-400">Borrar</button>`:""}
+                  <div class="flex gap-1">
+                    <button data-ir-parada="${p.id}" class="text-xs rounded-full px-3 py-1 ${seleccionada?"bg-brand-500 text-brand-900 font-semibold":"bg-neutral-800 border border-neutral-700 text-brand-500"}">${seleccionada?"✓ Aquí":"Ir"}</button>
+                    <button data-edit-parada="${p.id}" title="Editar parada" class="text-xs rounded-full bg-neutral-800 border border-neutral-700 px-2 py-1 text-neutral-300 hover:text-brand-500">✏️</button>
+                  </div>
+                  ${puedeVerificar ? `<button data-verificar="${p.id}" class="text-xs rounded-full bg-green-600 hover:bg-green-500 text-white font-semibold px-3 py-1 whitespace-nowrap">✓ Verificar</button>` : ""}
+                  ${yaVerificada && !p.confirmada ? `<span class="text-[10px] text-green-400">✓ verificada</span>` : ""}
+                  ${esMiaComunitaria?`<button data-del-parada="${p.id}" class="text-xs text-red-400">Borrar</button>`:""}
                 </div>
               </div>
             </div>`;
         }).join("");
 
-      // Toda la tarjeta selecciona (salvo botones)
       lista.querySelectorAll("[data-parada-card]").forEach(card => {
-        card.addEventListener("click", (e) => {
-          if (e.target.closest("button")) return;
-          seleccionarParada(card.dataset.paradaCard);
-        });
+        card.addEventListener("click", (e) => { if (e.target.closest("button")) return; seleccionarParada(card.dataset.paradaCard); });
       });
-      // Botón "Ir" / "✓ Aquí"
-      lista.querySelectorAll("[data-ir-parada]").forEach(b => b.addEventListener("click", (e) => {
+      lista.querySelectorAll("[data-ir-parada]").forEach(b => b.addEventListener("click", (e) => { e.stopPropagation(); seleccionarParada(b.dataset.irParada); }));
+      lista.querySelectorAll("[data-edit-parada]").forEach(b => b.addEventListener("click", (e) => {
         e.stopPropagation();
-        seleccionarParada(b.dataset.irParada);
+        mostrarFormularioParada(b.dataset.editParada);
       }));
-      // Borrar (solo paradas propias)
+      lista.querySelectorAll("[data-verificar]").forEach(b => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        b.disabled = true; b.textContent = "…";
+        encolarVerificacion(b.dataset.verificar);
+        showToast("✓ Verificación en cola");
+      }));
       lista.querySelectorAll("[data-del-parada]").forEach(b => b.addEventListener("click", (e) => {
         e.stopPropagation();
         if (!confirm("¿Borrar esta parada que añadiste?")) return;
@@ -1366,43 +1724,120 @@ function bindViewEvents() {
   }
 }
 
-/* ===================== Formulario añadir parada ===================== */
-function mostrarFormularioParada() {
+/* ===================== Formulario añadir/editar parada ===================== */
+let npMap = null, npMarker = null;
+
+function mostrarFormularioParada(paradaId) {
+  const editando = paradaId ? getAllParadas().find(x => x.id === paradaId) : null;
+  const esCatalogo = !!(editando && PARADAS_CATALOGO.some(x => x.id === editando.id));
+  const tituloModal = editando ? (esCatalogo ? "✏️ Editar parada oficial" : "✏️ Editar parada") : "📍 Nueva parada";
+  const subtitulo = editando
+    ? (esCatalogo ? "Cambios solo en tu dispositivo" : "Se actualiza al instante")
+    : "válida 24h si no la verifican";
+  const txtBoton = editando ? "Guardar cambios" : "Publicar";
+  const v = (k, def="") => editando ? (editando[k] ?? def) : def;
+
   const modal = document.createElement("div");
   modal.id = "modal-add-parada";
   modal.className = "fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4";
   modal.innerHTML = `
-    <div class="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-      <h3 class="text-lg font-bold">Añadir parada</h3>
-      <div class="space-y-3">
-        <input id="np-nombre" placeholder="Nombre de la parada *" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        <input id="np-direccion" placeholder="Dirección (ej: Calle Mayor, 1)" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        <input id="np-municipio" placeholder="Municipio" value="Madrid" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        <div class="grid grid-cols-2 gap-2">
-          <input id="np-plazas" placeholder="Plazas" inputmode="numeric" value="4" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-          <input id="np-horario" placeholder="Horario" value="24h" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        </div>
-        <p class="text-xs text-neutral-500">Coordenadas (se obtienen solas si buscas la dirección):</p>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="np-lat" placeholder="Latitud" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-          <input id="np-lng" placeholder="Longitud" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
-        </div>
-        <button id="np-geocode" class="w-full rounded-lg bg-blue-600 hover:bg-blue-500 py-2 text-sm font-medium">🔍 Obtener coordenadas de la dirección</button>
+    <div class="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold">${tituloModal}</h3>
+        <span class="text-[10px] text-neutral-500">${subtitulo}</span>
       </div>
+
+      <div class="space-y-2">
+        <input id="np-nombre" placeholder="Nombre *" value="${esc(v("nombre"))}" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        <div class="grid grid-cols-2 gap-2">
+          <input id="np-municipio" placeholder="Municipio" value="${esc(v("municipio","Madrid"))}" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <input id="np-plazas" placeholder="Plazas" inputmode="numeric" value="${v("plazas",4)}" class="rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        </div>
+        <input id="np-barrio" placeholder="Dirección / Referencia (opcional)" value="${esc(v("barrio",""))}" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-neutral-400 font-semibold">📍 Ubicación</span>
+          <button id="np-gps" class="text-xs rounded-full bg-blue-600 hover:bg-blue-500 px-3 py-1 font-semibold text-white">📍 Usar mi ubicación</button>
+        </div>
+        <div id="np-map"></div>
+        <div class="text-[11px] text-neutral-500 text-center" id="np-coords">Toca el mapa o arrastra el marcador</div>
+      </div>
+
+      <details class="text-xs text-neutral-400">
+        <summary class="cursor-pointer py-1">Opciones avanzadas</summary>
+        <div class="mt-2 space-y-2">
+          <input id="np-buscar" placeholder="Buscar dirección (ej: Calle Mayor, 1)" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+          <button id="np-geocode" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 py-2 text-sm font-medium">🔍 Buscar</button>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="np-lat" placeholder="Lat" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-2 text-xs font-mono" />
+            <input id="np-lng" placeholder="Lng" inputmode="decimal" class="rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-2 text-xs font-mono" />
+          </div>
+          <input id="np-horario" placeholder="Horario" value="${esc(v("horario","24h"))}" class="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-2 text-sm" />
+        </div>
+      </details>
+
+      ${editando && esCatalogo && state.paradasOverrides[editando.id] ? `
+        <button id="np-restore" class="w-full rounded-lg bg-neutral-800 border border-yellow-600/40 hover:bg-neutral-700 py-2 text-xs text-yellow-400 font-medium">
+          ↺ Restaurar posición original del catálogo
+        </button>
+      ` : ""}
+
       <div class="flex gap-2">
         <button id="np-cancel" class="flex-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 py-2 font-medium">Cancelar</button>
-        <button id="np-save" class="flex-1 rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">Guardar</button>
+        <button id="np-save" class="flex-1 rounded-lg bg-brand-500 hover:bg-brand-400 text-brand-900 py-2 font-semibold">${txtBoton}</button>
       </div>
       <p id="np-status" class="text-xs text-neutral-500 text-center min-h-[1rem]"></p>
     </div>`;
   document.body.appendChild(modal);
 
   const setStatus = (t) => { const el = document.getElementById("np-status"); if (el) el.textContent = t; };
+  const setCoordsTxt = (lat, lng) => {
+    const el = document.getElementById("np-coords");
+    if (el) el.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    document.getElementById("np-lat").value = lat.toFixed(6);
+    document.getElementById("np-lng").value = lng.toFixed(6);
+  };
 
-  document.getElementById("np-cancel").addEventListener("click", () => modal.remove());
+  const startLat = editando?.lat ?? lastPosition?.lat ?? 40.4168;
+  const startLng = editando?.lng ?? lastPosition?.lng ?? -3.7038;
+  const startZoom = editando ? 17 : (lastPosition ? 17 : 12);
+
+  setTimeout(() => {
+    npMap = L.map("np-map", { zoomControl: false, attributionControl: false }).setView([startLat, startLng], startZoom);
+    L.tileLayer("https://{s}.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}", {
+      subdomains: ["mt0","mt1","mt2","mt3"], maxZoom: 21,
+    }).addTo(npMap);
+    const pinIcon = L.divIcon({
+      className:"",
+      html:`<div style="background:#f5b400;border:3px solid #fff;width:22px;height:22px;border-radius:50%;box-shadow:0 0 0 8px rgba(245,180,0,0.35), 0 2px 6px rgba(0,0,0,0.5)"></div>`,
+      iconSize:[22,22], iconAnchor:[11,11],
+    });
+    npMarker = L.marker([startLat, startLng], { icon: pinIcon, draggable: true }).addTo(npMap);
+    npMarker.on("dragend", () => { const p = npMarker.getLatLng(); setCoordsTxt(p.lat, p.lng); });
+    npMap.on("click", (e) => { npMarker.setLatLng(e.latlng); setCoordsTxt(e.latlng.lat, e.latlng.lng); });
+    setCoordsTxt(startLat, startLng);
+    setTimeout(() => { try { npMap.invalidateSize(); } catch(e){} }, 80);
+  }, 60);
+
+  document.getElementById("np-gps").addEventListener("click", () => {
+    if (!lastPosition) { setStatus("⚠️ Esperando GPS…"); initGeolocation(true); return; }
+    const { lat, lng } = lastPosition;
+    if (npMap && npMarker) {
+      npMarker.setLatLng([lat, lng]);
+      npMap.flyTo([lat, lng], 17, { duration: 0.5 });
+      setCoordsTxt(lat, lng);
+    }
+  });
+
+  document.getElementById("np-cancel").addEventListener("click", () => {
+    if (npMap) { try { npMap.remove(); } catch(e){} npMap = null; npMarker = null; }
+    modal.remove();
+  });
 
   document.getElementById("np-geocode").addEventListener("click", async () => {
-    const dir = document.getElementById("np-direccion").value.trim();
+    const dir = document.getElementById("np-buscar").value.trim();
     const mun = document.getElementById("np-municipio").value.trim();
     if (!dir) { setStatus("Escribe una dirección primero."); return; }
     setStatus("Buscando…");
@@ -1411,34 +1846,76 @@ function mostrarFormularioParada() {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`, { headers: { "Accept": "application/json" } });
       const data = await res.json();
       if (data && data.length > 0) {
-        document.getElementById("np-lat").value = Number(data[0].lat).toFixed(6);
-        document.getElementById("np-lng").value = Number(data[0].lon).toFixed(6);
+        const lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+        if (npMap && npMarker) { npMarker.setLatLng([lat, lng]); npMap.flyTo([lat, lng], 17, { duration: 0.5 }); }
+        setCoordsTxt(lat, lng);
         setStatus(`✅ ${data[0].display_name}`);
-      } else {
-        setStatus("⚠️ No se encontró. Prueba con 'Calle X, nº, municipio'.");
-      }
-    } catch (e) {
-      setStatus("⚠️ Error al buscar. Revisa la conexión.");
-    }
+      } else setStatus("⚠️ No se encontró.");
+    } catch(e) { setStatus("⚠️ Error al buscar."); }
   });
 
-  document.getElementById("np-save").addEventListener("click", () => {
+  const btnRestore = document.getElementById("np-restore");
+  if (btnRestore) btnRestore.addEventListener("click", () => {
+    if (!editando) return;
+    if (!confirm("¿Deshacer los cambios y volver al valor original del catálogo?")) return;
+    delete state.paradasOverrides[editando.id];
+    save(); recalcularClusters();
+    if (npMap) { try { npMap.remove(); } catch(e){} npMap = null; npMarker = null; }
+    modal.remove();
+    showToast("↺ Parada restaurada al original");
+    render();
+  });
+
+  document.getElementById("np-save").addEventListener("click", async () => {
     const nombre = document.getElementById("np-nombre").value.trim();
     const municipio = document.getElementById("np-municipio").value.trim() || "—";
-    const barrio = document.getElementById("np-direccion").value.trim() || "—";
+    const barrio = document.getElementById("np-barrio").value.trim() || "—";
     const plazas = Number(document.getElementById("np-plazas").value) || 1;
     const horario = document.getElementById("np-horario").value.trim() || "24h";
     const lat = parseFloat(document.getElementById("np-lat").value);
     const lng = parseFloat(document.getElementById("np-lng").value);
 
     if (!nombre) { setStatus("El nombre es obligatorio."); return; }
-    if (isNaN(lat) || isNaN(lng)) { setStatus("Faltan coordenadas. Pulsa 'Obtener coordenadas'."); return; }
+    if (isNaN(lat) || isNaN(lng)) { setStatus("Faltan coordenadas. Toca el mapa."); return; }
 
-    state.paradasUsuario.push({ id: uid("usr"), nombre, municipio, barrio, plazas, horario, lat, lng });
-    save();
-    recalcularClusters();
+    const valores = { nombre, municipio, barrio, plazas, horario, lat, lng };
+
+    // ---- MODO EDICIÓN ----
+    if (editando) {
+      if (esCatalogo) {
+        const orig = PARADAS_CATALOGO.find(x => x.id === editando.id);
+        const ov = {};
+        Object.keys(valores).forEach(k => {
+          if (String(orig[k]) !== String(valores[k])) ov[k] = valores[k];
+        });
+        if (Object.keys(ov).length === 0) delete state.paradasOverrides[editando.id];
+        else state.paradasOverrides[editando.id] = ov;
+      } else {
+        const idx = state.paradasUsuario.findIndex(x => x.id === editando.id);
+        if (idx >= 0) state.paradasUsuario[idx] = { ...state.paradasUsuario[idx], ...valores };
+      }
+      save(); recalcularClusters();
+      if (npMap) { try { npMap.remove(); } catch(e){} npMap = null; npMarker = null; }
+      modal.remove();
+      showToast(`✏️ "${nombre}" actualizada`);
+      render();
+      return;
+    }
+
+    // ---- MODO CREACIÓN ----
+    const ahora = Date.now();
+    const nueva = {
+      id: uid("usr"), nombre, municipio, barrio, plazas, horario, lat, lng,
+      creador: getTaxistaId(), creadaEn: ahora, expira: ahora + PARADA_VIDA_MS,
+      verificaciones: { [getTaxistaId()]: ahora },
+      confirmada: false,
+    };
+    state.paradasUsuario.push(nueva);
+    save(); recalcularClusters();
+    if (npMap) { try { npMap.remove(); } catch(e){} npMap = null; npMarker = null; }
     modal.remove();
-    showToast(`✅ "${nombre}" añadida`);
+    showToast(`✅ "${nombre}" publicada`);
+    publicarNuevaParada(nueva).then(ok => { if (ok) showToast("📡 Enviada a la red"); });
     render();
   });
 }
@@ -1466,12 +1943,19 @@ function paradaPopupHtml(p) {
     : `<span style="color:#999">Sin datos</span>`;
   const dist = lastPosition ? distanceMeters(lastPosition.lat, lastPosition.lng, p.lat, p.lng) : null;
   const distTxt = dist != null ? ` · ${dist<1000?Math.round(dist)+" m":(dist/1000).toFixed(1)+" km"}` : "";
+  const esComunitaria = !!p.creador;
+  const nVerif = esComunitaria ? Object.keys(p.verificaciones || {}).length : 0;
+  const editada = esParadaEditada(p.id);
   return `<div style="color:#111;font-family:inherit;min-width:180px">
-    <b>${esc(p.nombre)}</b><br>
+    <b>${esc(p.nombre)}</b>${editada?' <span style="color:#b45309;font-size:10px">✏️</span>':''}<br>
     <span style="font-size:11px;color:#666">${esc(p.barrio)} · ${p.plazas} plazas${distTxt}</span>
     <div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee;font-size:11px;line-height:1.5">
       <div><b>📊 Frecuencia:</b> ${frecTxt}</div>
       <div><b>🔥 Avisos:</b> ${f.avisos} &nbsp; <b>👥 Visitas:</b> ${f.visitas}</div>
+      ${esComunitaria ? `<div><b>${p.confirmada?"✓ Confirmada":"⏳ Pendiente"}:</b> ${nVerif}/${PARADA_MIN_VERIF}</div>` : ""}
+    </div>
+    <div style="margin-top:8px;">
+      <button data-popup-edit="${p.id}" style="background:#f5b400;color:#1a1400;border:none;border-radius:6px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer;">✏️ Editar</button>
     </div>
   </div>`;
 }
@@ -1495,7 +1979,6 @@ function initMap() {
   paradaMarkers = {}; userMarker = null; userCircle = null;
   fireMarkers = [];
 
-  // Centro inicial: si hay parada seleccionada, centrar en ella; si no, en el usuario; si no, Madrid
   let center, zoom;
   const selP = state.paradaSeleccionadaId ? getAllParadas().find(x => x.id === state.paradaSeleccionadaId) : null;
   if (selP) { center = [selP.lat, selP.lng]; zoom = 16; }
@@ -1506,12 +1989,23 @@ function initMap() {
     map = L.map("map", { zoomControl:true }).setView(center, zoom);
   } catch(e) { console.error("Error creando mapa:", e); return; }
 
-  // Teselas estilo Google Maps (roadmap estándar)
   L.tileLayer("https://{s}.google.com/vt/lyrs=m&hl=es&x={x}&y={y}&z={z}", {
     attribution: 'Map data &copy; Google',
     subdomains: ["mt0","mt1","mt2","mt3"],
     maxZoom: 21,
   }).addTo(map);
+
+  map.on("popupopen", (e) => {
+    const btn = e.popup.getElement()?.querySelector("[data-popup-edit]");
+    if (btn) {
+      L.DomEvent.disableClickPropagation(btn);
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        map.closePopup();
+        mostrarFormularioParada(btn.dataset.popupEdit);
+      });
+    }
+  });
 
   setTimeout(() => { if (map) map.invalidateSize(); }, 150);
 
@@ -1549,11 +2043,8 @@ function initMap() {
   updateFireMarkers();
   initGeolocation();
 
-  // Si hay una parada seleccionada, abrir su popup al entrar
   if (selP && paradaMarkers[selP.id]) {
-    setTimeout(() => {
-      try { paradaMarkers[selP.id].openPopup(); } catch(e){}
-    }, 400);
+    setTimeout(() => { try { paradaMarkers[selP.id].openPopup(); } catch(e){} }, 400);
   }
 }
 
@@ -1595,7 +2086,6 @@ function refreshNearbyMarkers() {
 
       paradaMarkers[p.id] = marker;
     } else {
-      // Actualizar popup por si cambió la frecuencia
       paradaMarkers[p.id].setPopupContent(paradaPopupHtml(p));
     }
   });
@@ -1830,15 +2320,28 @@ setInterval(() => {
     if (huboCambios) save();
     if (state.view === "paradas" && map) updateFireMarkers();
     updateTicker();
+    // Purga de ultimoAviso (evita crecimiento sin límite)
+    const limite = now - MISMA_PARADA_DEDUP_MS;
+    let purgado = false;
+    Object.keys(state.ultimoAviso || {}).forEach(k => {
+      if (state.ultimoAviso[k] < limite) { delete state.ultimoAviso[k]; purgado = true; }
+    });
+    if (purgado) save();
   }
 }, 1000);
+
+/* Cada 5 min: mantenimiento de paradas y reintento de cola */
+setInterval(() => {
+  mantenimientoParadas();
+  procesarCola();
+}, 5*60*1000);
 
 /* ===================== Arranque ===================== */
 load();
 recalcularClusters();
 render();
 initGeolocation();
-if ("Notification" in window && Notification.permission === "granted") { /* ya concedido */ }
+setTimeout(procesarCola, 2000);
 </script>
 </body>
 </html>
