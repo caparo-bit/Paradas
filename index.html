@@ -1002,27 +1002,23 @@ function initFab() {
     }
   }
 
-  let pointerId = null;
   let startX = 0, startY = 0, startLeft = 0, startTop = 0;
   let moved = false;
+  let active = false;
 
-  const onDown = (e) => {
-    if (pointerId !== null) return;
-    if (e.button !== undefined && e.button !== 0 && e.pointerType === "mouse") return;
-    pointerId = e.pointerId;
-    try { fab.setPointerCapture(pointerId); } catch(err){}
+  const handleStart = (x, y) => {
     const r = fab.getBoundingClientRect();
-    startX = e.clientX; startY = e.clientY;
-    startLeft = r.left;  startTop = r.top;
+    startX = x; startY = y;
+    startLeft = r.left; startTop = r.top;
     moved = false;
+    active = true;
     fab.classList.add("dragging");
-    e.preventDefault();
   };
 
-  const onMove = (e) => {
-    if (pointerId === null || e.pointerId !== pointerId) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
+  const handleMove = (x, y) => {
+    if (!active) return;
+    const dx = x - startX;
+    const dy = y - startY;
     if (!moved && Math.hypot(dx, dy) > FAB_DRAG_THRESHOLD_PX) moved = true;
     if (!moved) return;
     const r = fab.getBoundingClientRect();
@@ -1033,33 +1029,59 @@ function initFab() {
     fab.style.top  = c.top  + "px";
   };
 
-  const onUp = (e) => {
-    if (pointerId === null || e.pointerId !== pointerId) return;
+  const handleEnd = () => {
+    if (!active) return;
+    active = false;
     const wasMoved = moved;
     moved = false;
-    pointerId = null;
     fab.classList.remove("dragging");
-    try { fab.releasePointerCapture(e.pointerId); } catch(err){}
     if (wasMoved) {
       const r = fab.getBoundingClientRect();
       state.fabPos = { left: r.left, top: r.top };
       save();
     } else {
-      try { navigator.vibrate && navigator.vibrate(20); } catch(err){}
+      try { navigator.vibrate && navigator.vibrate(20); } catch(e){}
       pedirConfirmacionHayPublico();
     }
   };
 
-  const onCancel = (e) => {
-    if (pointerId === null || e.pointerId !== pointerId) return;
-    moved = false; pointerId = null;
-    fab.classList.remove("dragging");
-  };
+  // -------- Touch (Android / iOS) --------
+  fab.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    handleStart(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
 
-  fab.addEventListener("pointerdown", onDown);
-  fab.addEventListener("pointermove", onMove);
-  fab.addEventListener("pointerup", onUp);
-  fab.addEventListener("pointercancel", onCancel);
+  fab.addEventListener("touchmove", (e) => {
+    if (!active) return;
+    const t = e.touches[0];
+    handleMove(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+
+  fab.addEventListener("touchend", (e) => {
+    handleEnd();
+    e.preventDefault();
+  }, { passive: false });
+
+  fab.addEventListener("touchcancel", () => {
+    active = false;
+    moved = false;
+    fab.classList.remove("dragging");
+  });
+
+  // -------- Mouse (escritorio) --------
+  fab.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    handleStart(e.clientX, e.clientY);
+  });
+  fab.addEventListener("mousemove", (e) => {
+    if (!active) return;
+    handleMove(e.clientX, e.clientY);
+  });
+  fab.addEventListener("mouseup", () => handleEnd());
+
   fab.addEventListener("contextmenu", (e) => e.preventDefault());
 }
 
@@ -2421,4 +2443,4 @@ setTimeout(procesarCola, 2000);
   }
 </script>
 </body>
-</html>
+  </html>
