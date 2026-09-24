@@ -4,6 +4,8 @@
    ============================================================ */
 
 (function(){
+  const LS_KEY = "taxidiario-wakelock";
+
   let wakeLock = null;
   let activo = false;
 
@@ -12,7 +14,7 @@
       console.warn("[WakeLock] No soportado");
       return false;
     }
-    if (activo) return true;
+    if (activo && wakeLock) return true;
 
     try {
       wakeLock = await navigator.wakeLock.request("screen");
@@ -20,6 +22,7 @@
 
       wakeLock.addEventListener("release", () => {
         activo = false;
+        wakeLock = null;
         console.log("[WakeLock] Liberado por el sistema");
       });
 
@@ -28,44 +31,46 @@
     } catch (e) {
       console.warn("[WakeLock] Error:", e.message);
       activo = false;
+      wakeLock = null;
       return false;
     }
   }
 
   async function desactivar() {
-    if (wakeLock && activo) {
-      try { await wakeLock.release(); } catch(e){}
-      wakeLock = null;
-      activo = false;
-      console.log("[WakeLock] Desactivado");
+    if (wakeLock) {
+      try { await wakeLock.release(); } catch (e) {}
     }
+    wakeLock = null;
+    activo = false;
+    console.log("[WakeLock] Desactivado");
   }
 
-  // Re-adquirir al volver al primer plano (el navegador lo libera al ocultar)
+  // Re-adquirir al volver a primer plano si el usuario lo tenía activado
   document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState === "visible" && activo === false) {
-      // Solo re-adquirir si el usuario lo tenía activado
-      const quería = localStorage.getItem("taxidiario-wakelock") === "1";
-      if (quería) await activar();
+    if (document.visibilityState !== "visible") return;
+    const queria = localStorage.getItem(LS_KEY) === "1";
+    if (queria && !activo) {
+      await activar();
     }
   });
 
+  // API pública
   window.TaxiWakeLock = {
     activar: async () => {
       const ok = await activar();
-      if (ok) localStorage.setItem("taxidiario-wakelock", "1");
+      localStorage.setItem(LS_KEY, ok ? "1" : "0");
       return ok;
     },
     desactivar: async () => {
       await desactivar();
-      localStorage.setItem("taxidiario-wakelock", "0");
+      localStorage.setItem(LS_KEY, "0");
     },
     estaActivo: () => activo,
     estaSoportado: () => "wakeLock" in navigator,
   };
 
-  // Auto-activar si el usuario lo tenía activado antes
-  if (localStorage.getItem("taxidiario-wakelock") === "1" && document.visibilityState === "visible") {
+  // Auto-activar si estaba activo
+  if (localStorage.getItem(LS_KEY) === "1" && document.visibilityState === "visible") {
     activar();
   }
 })();
