@@ -7,14 +7,14 @@
 const CACHE = "taxidiario-v1";
 
 // Icono real (los data:URI no funcionan bien en notificaciones)
-const ICON_URL = new URL("icons/icon-192.png", self.registration.scope).href;
+const ICON_URL = new URL("icon-192.png", self.registration.scope).href;
 
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icon-192.png",
+  "./icon-512.png",
 ];
 
 /* ---------- Instalación ---------- */
