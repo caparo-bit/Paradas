@@ -45,7 +45,7 @@
     console.log("[WakeLock] Desactivado");
   }
 
-  // Re-adquirir al volver a primer plano si el usuario lo tenía activado
+  // Re-adquirir al volver a primer plano
   document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState !== "visible") return;
     const queria = localStorage.getItem(LS_KEY) === "1";
