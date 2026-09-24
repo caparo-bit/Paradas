@@ -15,7 +15,11 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="TaxiDiario" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230b0b0d'/%3E%3Ctext x='256' y='340' font-size='280' text-anchor='middle'%3E%F0%9F%9A%95%3C/text%3E%3C/svg%3E" />
+
+<!-- Iconos (PNG reales, requeridos por PWABuilder y Android) -->
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 
 <!--
   ============================================================
@@ -1518,7 +1522,6 @@ function bindViewEvents() {
     // ---------- Web Push ----------
     const btnPush = document.getElementById("btn-push");
     if (btnPush) {
-      // Estado inicial
       const perm = window.TaxiPush ? window.TaxiPush.permisos() : "unsupported";
       if (perm === "granted") {
         btnPush.textContent = "✅ Avisos en 2º plano activos";
@@ -1550,9 +1553,9 @@ function bindViewEvents() {
           btnPush.classList.add("border-green-500", "text-green-400");
           showToast("📡 Recibirás avisos aunque cierres la app");
         } else {
-          btnPush.textContent = "❌ Error: " + (res.motivo || "desconocido");
+          btnPush.textContent = "❌ " + (res.motivo || "error");
           btnPush.disabled = false;
-          setTimeout(() => { btnPush.textContent = previo; }, 3000);
+          setTimeout(() => { btnPush.textContent = previo; }, 4000);
         }
       });
     }
@@ -2405,6 +2408,17 @@ recalcularClusters();
 render();
 initGeolocation();
 setTimeout(procesarCola, 2000);
+</script>
+
+<!-- Registro explícito del Service Worker (garantiza PWA válida en PWABuilder) -->
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js", { scope: "./" })
+        .then((r) => console.log("SW registrado:", r.scope))
+        .catch((e) => console.warn("SW falló:", e));
+    });
+  }
 </script>
 </body>
 </html>
