@@ -6,7 +6,6 @@
 (function(){
   const NTFY_BASE = "https://ntfy.sh";
 
-  // Ruta relativa: el navegador la resuelve respecto al index.html
   const SW_URL = "sw.js";
   const SW_SCOPE = new URL("./", document.baseURI).pathname;
 
@@ -56,8 +55,6 @@
 
   // ------------------------------------------------------------
   // Obtener VAPID public key del servidor ntfy
-  // En ntfy.sh público NO hay endpoint /v1/config con web-push.
-  // Solo funciona en self-hosted. Si no la obtiene, devuelve null.
   // ------------------------------------------------------------
   async function obtenerVapidKey() {
     try {
@@ -75,14 +72,12 @@
   // ------------------------------------------------------------
   async function suscribirPush(topic) {
     try {
-      // 1. Permiso
       const permiso = await Notification.requestPermission();
       if (permiso !== "granted") {
         console.warn("[Push] Permiso denegado");
         return { ok: false, motivo: "denegado" };
       }
 
-      // 2. VAPID key
       const vapidKey = await obtenerVapidKey();
       if (!vapidKey) {
         return {
@@ -91,13 +86,11 @@
         };
       }
 
-      // 3. Registrar SW
       const reg = await registrarSW();
       if (!reg) return { ok: false, motivo: "sin-sw" };
 
       await navigator.serviceWorker.ready;
 
-      // 4. Suscripción existente o nueva
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
         sub = await reg.pushManager.subscribe({
@@ -108,7 +101,6 @@
 
       console.log("[Push] Suscripción:", sub.endpoint);
 
-      // 5. Enviar a ntfy (solo funciona en self-hosted)
       await enviarSuscripcionANtfy(topic, sub);
 
       return { ok: true, endpoint: sub.endpoint };
@@ -120,7 +112,6 @@
 
   // ------------------------------------------------------------
   // Enviar suscripción al endpoint de ntfy
-  // Requiere ntfy self-hosted con web-push habilitado.
   // ------------------------------------------------------------
   async function enviarSuscripcionANtfy(topic, subscription) {
     const payload = {
