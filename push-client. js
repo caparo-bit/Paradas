@@ -5,7 +5,10 @@
 
 (function(){
   const NTFY_BASE = "https://ntfy.sh";
-  const SW_URL = "/paradas/sw.js";
+
+  // Ruta relativa: el navegador la resuelve respecto al index.html
+  const SW_URL = "sw.js";
+  const SW_SCOPE = new URL("./", document.baseURI).pathname;
 
   // ------------------------------------------------------------
   // Registrar el Service Worker
@@ -16,7 +19,7 @@
       return null;
     }
     try {
-      const reg = await navigator.serviceWorker.register(SW_URL, { scope: "/paradas/" });
+      const reg = await navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE });
       console.log("[Push] SW registrado:", reg.scope);
       return reg;
     } catch (e) {
@@ -26,8 +29,7 @@
   }
 
   // ------------------------------------------------------------
-  // Convertir VAPID public key base64url → Uint8Array
-  // (ntfy usa su propia clave VAPID pública)
+  // base64url → Uint8Array
   // ------------------------------------------------------------
   function urlBase64ToUint8Array(base64String) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -41,14 +43,31 @@
   }
 
   // ------------------------------------------------------------
-  // Obtener la VAPID public key de ntfy
-  // ntfy la expone en /v1/config o en el endpoint de suscripción
+  // ArrayBuffer → base64 (SIN spread, evita RangeError)
+  // ------------------------------------------------------------
+  function bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  // ------------------------------------------------------------
+  // Obtener VAPID public key del servidor ntfy
+  // En ntfy.sh público NO hay endpoint /v1/config con web-push.
+  // Solo funciona en self-hosted. Si no la obtiene, devuelve null.
   // ------------------------------------------------------------
   async function obtenerVapidKey() {
-    // ntfy.sh público usa esta clave fija (basta para su servidor)
-    // Si usas self-hosted, cámbiala por la tuya
-    const VAPID_PUBLIC_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U";
-    return VAPID_PUBLIC_KEY;
+    try {
+      const res = await fetch(`${NTFY_BASE}/v1/config`);
+      if (!res.ok) return null;
+      const cfg = await res.json();
+      return cfg["web-push-public-key"] || null;
+    } catch (e) {
+      return null;
+    }
   }
 
   // ------------------------------------------------------------
@@ -56,26 +75,31 @@
   // ------------------------------------------------------------
   async function suscribirPush(topic) {
     try {
-      // 1. Pedir permiso
+      // 1. Permiso
       const permiso = await Notification.requestPermission();
       if (permiso !== "granted") {
         console.warn("[Push] Permiso denegado");
         return { ok: false, motivo: "denegado" };
       }
 
-      // 2. Registrar SW
+      // 2. VAPID key
+      const vapidKey = await obtenerVapidKey();
+      if (!vapidKey) {
+        return {
+          ok: false,
+          motivo: "ntfy.sh público no soporta Web Push. Usa self-hosted o FCM.",
+        };
+      }
+
+      // 3. Registrar SW
       const reg = await registrarSW();
       if (!reg) return { ok: false, motivo: "sin-sw" };
 
-      // 3. Esperar a que esté listo
       await navigator.serviceWorker.ready;
 
-      // 4. Comprobar suscripción existente
+      // 4. Suscripción existente o nueva
       let sub = await reg.pushManager.getSubscription();
-
       if (!sub) {
-        // 5. Crear nueva suscripción con VAPID
-        const vapidKey = await obtenerVapidKey();
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidKey),
@@ -84,7 +108,7 @@
 
       console.log("[Push] Suscripción:", sub.endpoint);
 
-      // 6. Enviar la suscripción a ntfy para ese topic
+      // 5. Enviar a ntfy (solo funciona en self-hosted)
       await enviarSuscripcionANtfy(topic, sub);
 
       return { ok: true, endpoint: sub.endpoint };
@@ -95,15 +119,15 @@
   }
 
   // ------------------------------------------------------------
-  // Enviar la suscripción al endpoint de ntfy
-  // ntfy espera un POST a <server>/<topic> con la suscripción
+  // Enviar suscripción al endpoint de ntfy
+  // Requiere ntfy self-hosted con web-push habilitado.
   // ------------------------------------------------------------
   async function enviarSuscripcionANtfy(topic, subscription) {
     const payload = {
       endpoint: subscription.endpoint,
       keys: {
-        p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("p256dh")))),
-        auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("auth")))),
+        p256dh: bufferToBase64(subscription.getKey("p256dh")),
+        auth:   bufferToBase64(subscription.getKey("auth")),
       },
     };
 
@@ -114,7 +138,7 @@
     });
 
     if (!res.ok) {
-      const txt = await res.text();
+      const txt = await res.text().catch(() => "");
       throw new Error(`ntfy respondió ${res.status}: ${txt}`);
     }
     console.log("[Push] Suscripción enviada a ntfy para topic:", topic);
@@ -125,7 +149,7 @@
   // ------------------------------------------------------------
   async function desuscribirPush() {
     try {
-      const reg = await navigator.serviceWorker.getRegistration("/paradas/");
+      const reg = await navigator.serviceWorker.getRegistration(SW_SCOPE);
       if (!reg) return { ok: false };
       const sub = await reg.pushManager.getSubscription();
       if (sub) await sub.unsubscribe();
